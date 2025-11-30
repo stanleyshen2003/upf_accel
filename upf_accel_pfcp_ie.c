@@ -327,6 +327,47 @@ int upf_build_nodeid_ipv4(uint32_t ip_be, uint8_t **out_buf, size_t *out_len)
     return upf_build_ie(PFCP_IE_NODE_ID, ipv4, 5, out_buf, out_len);
 }
 
+/* Build F-SEID IE: 8-byte SEID (big-endian) followed by optional 4-byte IPv4 address. */
+int upf_build_fseid(uint64_t seid, int has_ipv4, uint32_t ipv4_be, uint8_t **out_buf, size_t *out_len)
+{
+    if (!out_buf || !out_len) return -1;
+    uint8_t tmp[12]; size_t plen = 8;
+    uint64_t v = seid;
+    for (int i = 7; i >= 0; --i) {
+        tmp[i] = (uint8_t)(v & 0xff);
+        v >>= 8;
+    }
+    if (has_ipv4) {
+        tmp[8] = (uint8_t)((ipv4_be >> 24) & 0xff);
+        tmp[9] = (uint8_t)((ipv4_be >> 16) & 0xff);
+        tmp[10] = (uint8_t)((ipv4_be >> 8) & 0xff);
+        tmp[11] = (uint8_t)(ipv4_be & 0xff);
+        plen = 12;
+    }
+    return upf_build_ie(PFCP_IE_FSEID, tmp, (uint16_t)plen, out_buf, out_len);
+}
+
+/* Parse F-SEID IE: extract 8-byte SEID and optional IPv4 address. */
+int upf_ie_to_fseid(const struct upf_ie *ie, uint64_t *seid_out, int *has_ipv4, uint32_t *ipv4_out)
+{
+    if (!ie) return -1;
+    if (ie->len < 8) return -1;
+    uint64_t v = 0;
+    for (int i = 0; i < 8; ++i) v = (v << 8) | ie->value[i];
+    if (seid_out) *seid_out = v;
+    if (ie->len >= 12) {
+        if (has_ipv4) *has_ipv4 = 1;
+        if (ipv4_out) {
+            uint32_t ip = be32(&ie->value[8]);
+            *ipv4_out = ip;
+        }
+    } else {
+        if (has_ipv4) *has_ipv4 = 0;
+        if (ipv4_out) *ipv4_out = 0;
+    }
+    return 0;
+}
+
 /* Parse a Cause IE into struct upf_cause */
 int upf_ie_to_cause(const struct upf_ie *ie, struct upf_cause *out)
 {
