@@ -331,18 +331,27 @@ int upf_build_nodeid_ipv4(uint32_t ip_be, uint8_t **out_buf, size_t *out_len)
 int upf_build_fseid(uint64_t seid, int has_ipv4, uint32_t ipv4_be, uint8_t **out_buf, size_t *out_len)
 {
     if (!out_buf || !out_len) return -1;
-    uint8_t tmp[12]; size_t plen = 8;
+    /* Layout: 1 byte flags, 8 bytes SEID (big-endian), optional 4 bytes IPv4
+     * Total length = 9 (no IPv4) or 13 (with IPv4) */
+    uint8_t tmp[13]; size_t plen = 9;
+    /* flags: bit 7 (0x40) = IPv4 present, bit 8 (0x80) = IPv6 present */
+    uint8_t flags = 0;
+    if (has_ipv4) flags |= 0x40;
+    tmp[0] = flags;
+
+    /* write SEID into tmp[1..8] (big-endian) */
     uint64_t v = seid;
-    for (int i = 7; i >= 0; --i) {
+    for (int i = 8; i >= 1; --i) {
         tmp[i] = (uint8_t)(v & 0xff);
         v >>= 8;
     }
+
     if (has_ipv4) {
-        tmp[8] = (uint8_t)((ipv4_be >> 24) & 0xff);
-        tmp[9] = (uint8_t)((ipv4_be >> 16) & 0xff);
-        tmp[10] = (uint8_t)((ipv4_be >> 8) & 0xff);
-        tmp[11] = (uint8_t)(ipv4_be & 0xff);
-        plen = 12;
+        tmp[9]  = (uint8_t)((ipv4_be >> 24) & 0xff);
+        tmp[10] = (uint8_t)((ipv4_be >> 16) & 0xff);
+        tmp[11] = (uint8_t)((ipv4_be >> 8) & 0xff);
+        tmp[12] = (uint8_t)(ipv4_be & 0xff);
+        plen = 13;
     }
     return upf_build_ie(PFCP_IE_FSEID, tmp, (uint16_t)plen, out_buf, out_len);
 }
