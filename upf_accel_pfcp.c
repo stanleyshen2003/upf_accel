@@ -743,9 +743,10 @@ static void *pfcp_thread_func(void *arg)
                     } else if (pfcp_sock >= 0) {
                         struct sockaddr_in local; socklen_t local_len = sizeof(local);
                         if (getsockname(pfcp_sock, (struct sockaddr *)&local, &local_len) == 0) {
-                            uint8_t nodebuf[4];
-                            memcpy(nodebuf, &local.sin_addr.s_addr, 4);
-                            pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, nodebuf, 4);
+                            uint8_t nodebuf[5];
+                            nodebuf[0] = 0x00; /* type: IPv4 */
+                            memcpy(&nodebuf[1], &local.sin_addr.s_addr, 4);
+                            pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, nodebuf, 5);
                         } else {
                             pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, NULL, 0);
                         }

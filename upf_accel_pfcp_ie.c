@@ -51,12 +51,10 @@ int upf_parse_ies(const uint8_t *buf, size_t buflen, size_t start_off, struct up
     while (off + PFCP_IE_HDR_LEN <= buflen && idx < count) {
         uint16_t t = be16(&buf[off]);
         uint16_t l = be16(&buf[off + 2]);
-        uint8_t inst = buf[off + 4];
         size_t po = off + PFCP_IE_HDR_LEN;
         if (po + l > buflen) break;
         arr[idx].type = t;
         arr[idx].len = l;
-        arr[idx].instance = inst;
         arr[idx].value = &buf[po];
         idx++;
         off = po + l;
@@ -87,6 +85,14 @@ const struct upf_ie *upf_find_ie(const struct upf_ie *ies, size_t num, uint16_t 
 int upf_ie_to_nodeid(const struct upf_ie *ie, char *out, size_t outlen)
 {
     if (!ie || !out) return -1;
+    /* PFCP NodeID payload layout: 1 octet (type/flags) followed by
+     * address octets. For IPv4 address type, payload length is 5 and
+     * bytes [1..4] are the IPv4 address in network order. */
+    if (ie->len >= 5) {
+        snprintf(out, outlen, "%u.%u.%u.%u", ie->value[1], ie->value[2], ie->value[3], ie->value[4]);
+        return 0;
+    }
+    /* Fallback: if payload is exactly 4 bytes, treat it as raw IPv4 bytes */
     if (ie->len == 4) {
         snprintf(out, outlen, "%u.%u.%u.%u", ie->value[0], ie->value[1], ie->value[2], ie->value[3]);
         return 0;
@@ -282,9 +288,9 @@ int upf_parse_create_urr(const struct upf_ie *ie, struct upf_parsed_urr *out)
     return 0;
 }
 
-/* Generic IE builder: allocate buffer with Type(2) Length(2) Instance(1) Value(len)
+/* Generic IE builder: allocate buffer with Type(2) Length(2) Value(len)
  * Returns 0 on success and fills *out_buf/*out_len. Caller must free *out_buf. */
-int upf_build_ie(uint16_t ie_type, uint8_t instance, const uint8_t *value, uint16_t vlen, uint8_t **out_buf, size_t *out_len)
+int upf_build_ie(uint16_t ie_type, const uint8_t *value, uint16_t vlen, uint8_t **out_buf, size_t *out_len)
 {
     if (!out_buf || !out_len) return -1;
     size_t total = PFCP_IE_HDR_LEN + vlen;
@@ -296,8 +302,6 @@ int upf_build_ie(uint16_t ie_type, uint8_t instance, const uint8_t *value, uint1
     /* Length (big-endian) */
     b[2] = (uint8_t)((vlen >> 8) & 0xff);
     b[3] = (uint8_t)(vlen & 0xff);
-    /* Instance */
-    b[4] = instance;
     if (vlen && value)
         memcpy(&b[PFCP_IE_HDR_LEN], value, vlen);
     *out_buf = b;
@@ -310,12 +314,14 @@ int upf_build_ie(uint16_t ie_type, uint8_t instance, const uint8_t *value, uint1
  * Produces an IE with type PFCP_IE_NODE_ID and payload 4 bytes. */
 int upf_build_nodeid_ipv4(uint32_t ip_be, uint8_t **out_buf, size_t *out_len)
 {
-    uint8_t ipv4[4];
-    ipv4[0] = (uint8_t)((ip_be >> 24) & 0xff);
-    ipv4[1] = (uint8_t)((ip_be >> 16) & 0xff);
-    ipv4[2] = (uint8_t)((ip_be >> 8) & 0xff);
-    ipv4[3] = (uint8_t)(ip_be & 0xff);
-    return upf_build_ie(PFCP_IE_NODE_ID, 0, ipv4, 4, out_buf, out_len);
+    /* NodeID payload: 1 byte type/flags + 4 bytes IPv4 address (network order) */
+    uint8_t ipv4[5];
+    ipv4[0] = 0x00; /* type: IPv4 (spare bits zero) */
+    ipv4[1] = (uint8_t)((ip_be >> 24) & 0xff);
+    ipv4[2] = (uint8_t)((ip_be >> 16) & 0xff);
+    ipv4[3] = (uint8_t)((ip_be >> 8) & 0xff);
+    ipv4[4] = (uint8_t)(ip_be & 0xff);
+    return upf_build_ie(PFCP_IE_NODE_ID, ipv4, 5, out_buf, out_len);
 }
 
 /* Parse a Cause IE into struct upf_cause */
@@ -343,5 +349,5 @@ int upf_build_cause(uint8_t cause, int has_value, uint8_t value, uint8_t **out_b
         payload[1] = value;
         plen = 2;
     }
-    return upf_build_ie(PFCP_IE_CAUSE, 0, payload, (uint16_t)plen, out_buf, out_len);
+    return upf_build_ie(PFCP_IE_CAUSE, payload, (uint16_t)plen, out_buf, out_len);
 }

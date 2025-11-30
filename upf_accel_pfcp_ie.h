@@ -7,8 +7,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
-/* IE header length: Type(2) + Length(2) + Instance(1) */
-#define PFCP_IE_HDR_LEN 5
+/* IE header length: Type(2) + Length(2) */
+#define PFCP_IE_HDR_LEN 4
 
 #define PFCP_IE_CREATE_PDR 1
 #define PFCP_IE_PDI 2
@@ -51,10 +51,9 @@
 
 /* Generic parsed IE item — points into the original buffer for value */
 struct upf_ie {
-	uint16_t type;
-	uint16_t len; /* length of value */
-	uint8_t instance;
-	const uint8_t *value; /* pointer to start of value */
+    uint16_t type;
+    uint16_t len; /* length of value */
+    const uint8_t *value; /* pointer to start of value */
 };
 
 /* Lightweight parsed PDR/FAR/QER/URR summaries used by higher-level code */
@@ -122,9 +121,9 @@ int upf_ie_to_cause(const struct upf_ie *ie, struct upf_cause *out);
  * If has_value is 1 the payload is 2 bytes (cause + value). */
 int upf_build_cause(uint8_t cause, int has_value, uint8_t value, uint8_t **out_buf, size_t *out_len);
 
-/* IE builder helpers - allocate a buffer containing a single IE (type+len+instance+value).
+/* IE builder helpers - allocate a buffer containing a single IE (type+len+value).
  * Caller is responsible for freeing *out_buf via free(). Returns 0 on success. */
-int upf_build_ie(uint16_t ie_type, uint8_t instance, const uint8_t *value, uint16_t vlen, uint8_t **out_buf, size_t *out_len);
+int upf_build_ie(uint16_t ie_type, const uint8_t *value, uint16_t vlen, uint8_t **out_buf, size_t *out_len);
 
 /* Convenience builder for NodeID IE carrying an IPv4 address (vlen == 4).
  * ip_be should be in network byte order (big-endian) as uint32_t. */

@@ -17,7 +17,7 @@ struct pfcp_packet newPFCPAssociationResponse(uint8_t req_msg_type, uint32_t seq
     /* Optional NodeID IE (use provided payload if any) */
     if (nodeid_payload && nodeid_len > 0) {
         uint8_t *b = NULL; size_t bl = 0;
-        if (upf_build_ie(PFCP_IE_NODE_ID, 0, nodeid_payload, nodeid_len, &b, &bl) == 0) {
+        if (upf_build_ie(PFCP_IE_NODE_ID, nodeid_payload, nodeid_len, &b, &bl) == 0) {
             parts[parts_cnt] = b; parts_len[parts_cnt] = bl; parts_cnt++;
         }
     }
@@ -39,7 +39,7 @@ struct pfcp_packet newPFCPAssociationResponse(uint8_t req_msg_type, uint32_t seq
         rtsb[2] = (uint8_t)((rts >> 8) & 0xff);
         rtsb[3] = (uint8_t)(rts & 0xff);
         uint8_t *b = NULL; size_t bl = 0;
-        if (upf_build_ie(0x0005, 0, rtsb, 4, &b, &bl) == 0) {
+        if (upf_build_ie(0x0005, rtsb, 4, &b, &bl) == 0) {
             parts[parts_cnt] = b; parts_len[parts_cnt] = bl; parts_cnt++;
         }
     }
