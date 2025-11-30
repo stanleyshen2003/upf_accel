@@ -24,6 +24,9 @@
 #include "upf_accel_pfcp_generic.h"
 #include <time.h>
 
+/* PFCP IE header length: Type (2) + Length (2) + Instance (1) */
+#define PFCP_IE_HDR_LEN 5
+
 /* Forward declarations for endian helpers (used in parsing before their full definitions) */
 static inline uint16_t be16(const uint8_t *b);
 static inline uint32_t be32(const uint8_t *b);
@@ -240,10 +243,10 @@ static struct rx_trans *rx_trans_find_and_remove(const struct sockaddr_in *addr,
 static int find_ie_in_msg(const uint8_t *buf, size_t buflen, size_t start_off, uint16_t ie_type, const uint8_t **payload_out, uint16_t *len_out)
 {
     size_t off = start_off;
-    while (off + 4 <= buflen) {
+    while (off + PFCP_IE_HDR_LEN <= buflen) {
         uint16_t t = be16(&buf[off]);
         uint16_t l = be16(&buf[off + 2]);
-        size_t po = off + 4;
+        size_t po = off + PFCP_IE_HDR_LEN; /* payload offset after type/len/instance */
         if (po + l > buflen)
             return -1;
         if (t == ie_type) {
@@ -310,10 +313,10 @@ static void parse_create_far(const uint8_t *payload, size_t len, struct upf_acce
 
     /* Iterate over top-level child IEs inside the CreateFAR payload. Each IE
      * has a 2-byte type and 2-byte length followed by `length` bytes of value. */
-    while (off + 4 <= len) {
+    while (off + PFCP_IE_HDR_LEN <= len) {
         uint16_t t = be16(&payload[off]);        /* IE type */
         uint16_t l = be16(&payload[off + 2]);    /* IE length */
-        size_t po = off + 4;                     /* payload offset of this IE */
+        size_t po = off + PFCP_IE_HDR_LEN;       /* payload offset of this IE */
 
         /* Bounds check: ensure the reported length fits inside the overall payload */
         if (po + l > len)
@@ -333,10 +336,10 @@ static void parse_create_far(const uint8_t *payload, size_t len, struct upf_acce
             size_t inner_off = po;
             size_t inner_end = po + l;
 
-            while (inner_off + 4 <= inner_end) {
+            while (inner_off + PFCP_IE_HDR_LEN <= inner_end) {
                 uint16_t it = be16(&payload[inner_off]);
                 uint16_t il = be16(&payload[inner_off + 2]);
-                size_t ip = inner_off + 4; /* inner payload offset */
+                size_t ip = inner_off + PFCP_IE_HDR_LEN; /* inner payload offset */
                 if (ip + il > inner_end)
                     break;
 
@@ -344,10 +347,10 @@ static void parse_create_far(const uint8_t *payload, size_t len, struct upf_acce
                     /* Scan children of OuterHeaderCreation for F-TEID */
                     size_t op_off = ip;
                     size_t op_end = ip + il;
-                    while (op_off + 4 <= op_end) {
+                    while (op_off + PFCP_IE_HDR_LEN <= op_end) {
                         uint16_t ot = be16(&payload[op_off]);
                         uint16_t ol = be16(&payload[op_off + 2]);
-                        size_t opp = op_off + 4;
+                        size_t opp = op_off + PFCP_IE_HDR_LEN;
                         if (opp + ol > op_end)
                             break;
 
@@ -394,10 +397,10 @@ static void parse_create_qer(const uint8_t *payload, size_t len, struct upf_acce
 {
     memset(qer, 0, sizeof(*qer));
     size_t off = 0;
-    while (off + 4 <= len) {
+    while (off + PFCP_IE_HDR_LEN <= len) {
         uint16_t t = be16(&payload[off]);
         uint16_t l = be16(&payload[off + 2]);
-        size_t po = off + 4;
+        size_t po = off + PFCP_IE_HDR_LEN;
         if (po + l > len)
             break;
         switch (t) {
@@ -438,10 +441,10 @@ static void parse_create_urr(const uint8_t *payload, size_t len, struct upf_acce
 {
     memset(urr, 0, sizeof(*urr));
     size_t off = 0;
-    while (off + 4 <= len) {
+    while (off + PFCP_IE_HDR_LEN <= len) {
         uint16_t t = be16(&payload[off]);
         uint16_t l = be16(&payload[off + 2]);
-        size_t po = off + 4;
+        size_t po = off + PFCP_IE_HDR_LEN;
         if (po + l > len)
             break;
         switch (t) {
@@ -475,10 +478,10 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
     memset(pdr, 0, sizeof(*pdr));
     pdr->pdi_qfi = 0;
     size_t off = 0;
-    while (off + 4 <= len) {
+    while (off + PFCP_IE_HDR_LEN <= len) {
         uint16_t t = be16(&payload[off]);
         uint16_t l = be16(&payload[off + 2]);
-        size_t po = off + 4;
+        size_t po = off + PFCP_IE_HDR_LEN;
         if (po + l > len)
             break;
         switch (t) {
@@ -495,10 +498,10 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
             {
                 size_t ipoff = po;
                 size_t ipend = po + l;
-                while (ipoff + 4 <= ipend) {
+                while (ipoff + PFCP_IE_HDR_LEN <= ipend) {
                     uint16_t it = be16(&payload[ipoff]);
                     uint16_t il = be16(&payload[ipoff + 2]);
-                    size_t ip = ipoff + 4;
+                    size_t ip = ipoff + PFCP_IE_HDR_LEN;
                     if (ip + il > ipend)
                         break;
                     switch (it) {
@@ -807,10 +810,10 @@ static void *pfcp_thread_func(void *arg)
             /* First pass: count Create* IEs */
             size_t off = hdr_off;
             size_t num_pdrs = 0, num_fars = 0, num_qers = 0, num_urrs = 0;
-            while (off + 4 <= (size_t)n) {
+            while (off + PFCP_IE_HDR_LEN <= (size_t)n) {
                 uint16_t ie_type = be16((uint8_t *)&buf[off]);
                 uint16_t ie_lenv = be16((uint8_t *)&buf[off + 2]);
-                size_t payload_off = off + 4;
+                size_t payload_off = off + PFCP_IE_HDR_LEN;
                 if (payload_off + ie_lenv > (size_t)n)
                     break;
                 switch (ie_type) {
@@ -869,10 +872,10 @@ static void *pfcp_thread_func(void *arg)
                     /* Second pass: parse and fill */
                     off = hdr_off;
                     size_t pdr_idx = 0, far_idx = 0, qer_idx = 0, urr_idx = 0;
-                    while (off + 4 <= (size_t)n) {
+                    while (off + PFCP_IE_HDR_LEN <= (size_t)n) {
                         uint16_t ie_type = be16((uint8_t *)&buf[off]);
                         uint16_t ie_lenv = be16((uint8_t *)&buf[off + 2]);
-                        size_t payload_off = off + 4;
+                        size_t payload_off = off + PFCP_IE_HDR_LEN;
                         if (payload_off + ie_lenv > (size_t)n)
                             break;
                         const uint8_t *ie_payload = (const uint8_t *)&buf[payload_off];
