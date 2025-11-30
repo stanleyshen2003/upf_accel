@@ -37,6 +37,9 @@ int upf_parse_ies(const uint8_t *buf, size_t buflen, size_t start_off, struct up
         off = po + l;
     }
 
+    printf("Top-level IEs parsed: %zu\n", count);
+    printf("buflen=%zu start_off=%zu\n", buflen, start_off);
+
     if (count == 0) {
         *ies_out = NULL;
         *num_out = 0;
