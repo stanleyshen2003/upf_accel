@@ -1032,6 +1032,8 @@ static void *pfcp_thread_func(void *arg)
                                     }
                                 }
                             }
+                            printf("PFCP: building Session Establishment Response (seq=%u, req_seid=0x%llx)\n",
+                                   seq, (unsigned long long)request_seid);
                             struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg, node_payload, node_payload_len, request_seid);
                             if (!pkt.buf || pkt.len == 0) {
                                 fprintf(stderr, "PFCP: failed to build Session Establishment Response\n");

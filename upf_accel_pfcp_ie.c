@@ -351,20 +351,29 @@ int upf_build_fseid(uint64_t seid, int has_ipv4, uint32_t ipv4_be, uint8_t **out
 int upf_ie_to_fseid(const struct upf_ie *ie, uint64_t *seid_out, int *has_ipv4, uint32_t *ipv4_out)
 {
     if (!ie) return -1;
-    if (ie->len < 8) return -1;
+    /* Must have at least: 1 byte flags + 8 bytes SEID */
+    if (ie->len < 9) return -1;
+    uint8_t flags = ie->value[0];
+    /* SEID occupies octets 2..9 (1-based) -> indexes 1..8 (0-based) */
     uint64_t v = 0;
-    for (int i = 0; i < 8; ++i) v = (v << 8) | ie->value[i];
+    for (int i = 1; i <= 8; ++i) v = (v << 8) | ie->value[i];
     if (seid_out) *seid_out = v;
-    if (ie->len >= 12) {
-        if (has_ipv4) *has_ipv4 = 1;
+
+    /* Flags: bit 7 (0x40) indicates IPv4 present, bit 8 (0x80) indicates IPv6 present */
+    int ipv4_present = (flags & 0x02) ? 1 : 0;
+    if (has_ipv4) *has_ipv4 = ipv4_present;
+
+    if (ipv4_present) {
+        /* IPv4 address follows SEID: requires additional 4 bytes */
+        if (ie->len < 9 + 4) return -1;
         if (ipv4_out) {
-            uint32_t ip = be32(&ie->value[8]);
+            uint32_t ip = be32(&ie->value[9]);
             *ipv4_out = ip;
         }
     } else {
-        if (has_ipv4) *has_ipv4 = 0;
         if (ipv4_out) *ipv4_out = 0;
     }
+
     return 0;
 }
 
