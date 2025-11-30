@@ -14,7 +14,7 @@ struct pfcp_packet newPFCPEstablishmentResponse(uint8_t seq, bool s_flag, struct
     if (!rspbuf) return pkt;
     size_t rsp_off = 0;
     uint64_t assigned_seid = ((uint64_t)time(NULL) << 32) | (uint64_t)(rand() & 0xffffffff);
-    uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0);
+    uint8_t oct1 = (1 << 5) | (s_flag ? 1 : 0);
     rspbuf[rsp_off++] = oct1;
     rspbuf[rsp_off++] = PFCP_MSG_SESSION_ESTABLISHMENT_RESPONSE;
     rsp_off += 2;
