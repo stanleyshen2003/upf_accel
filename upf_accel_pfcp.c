@@ -755,21 +755,24 @@ static void *pfcp_thread_func(void *arg)
                 rspbuf[ro++] = seq; rspbuf[ro++] = 0; rspbuf[ro++] = 1;
 
                 /* If the request carried a NodeID IE, echo it back in the response
-                 * (many reference implementations include NodeID + RecoveryTimeStamp
-                 * in Association responses). We already extracted `payload`/`plen`
-                 * above when registering the remote node. */
+                 * (go-pfcp typically includes NodeID first). */
                 if (payload && plen > 0) {
-                    /* NodeID IE header */
                     rspbuf[ro++] = (uint8_t)(PFCP_IE_NODE_ID >> 8);
                     rspbuf[ro++] = (uint8_t)(PFCP_IE_NODE_ID & 0xff);
-                    /* NodeID payload length */
                     rspbuf[ro++] = (uint8_t)((plen >> 8) & 0xff);
                     rspbuf[ro++] = (uint8_t)(plen & 0xff);
                     memcpy(&rspbuf[ro], payload, plen);
                     ro += plen;
                 }
 
-                /* RecoveryTimeStamp IE (type 0x0005) - 4 bytes (seconds since epoch) */
+                /* Cause IE (immediately after NodeID per go-pfcp ordering) */
+                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE >> 8);
+                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE & 0xff);
+                rspbuf[ro++] = 0; rspbuf[ro++] = 1;
+                rspbuf[ro++] = 1;
+
+                /* RecoveryTimeStamp IE (type 0x0005) - 4 bytes (seconds since epoch)
+                 * placed after Cause to match go-pfcp's typical marshaling order. */
                 {
                     uint32_t rts = (uint32_t)time(NULL);
                     rspbuf[ro++] = 0x00; rspbuf[ro++] = 0x05; /* IE type 5 */
@@ -779,12 +782,6 @@ static void *pfcp_thread_func(void *arg)
                     rspbuf[ro++] = (uint8_t)((rts >> 8) & 0xff);
                     rspbuf[ro++] = (uint8_t)(rts & 0xff);
                 }
-
-                /* Cause IE */
-                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE >> 8);
-                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE & 0xff);
-                rspbuf[ro++] = 0; rspbuf[ro++] = 1;
-                rspbuf[ro++] = 1;
                 uint16_t total_len = (uint16_t)(ro - 4);
                 rspbuf[2] = (uint8_t)((total_len >> 8) & 0xff);
                 rspbuf[3] = (uint8_t)((total_len & 0xff));
