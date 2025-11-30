@@ -3,6 +3,8 @@
 
 #include "upf_accel_pfcp_packet.h"
 #include <stdint.h>
+#include <stdbool.h>
+
 
 struct upf_accel_config; /* forward */
 
