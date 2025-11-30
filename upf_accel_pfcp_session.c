@@ -55,7 +55,6 @@ struct pfcp_packet newPFCPEstablishmentResponse(uint32_t seq, bool s_flag, struc
     /* F-SEID IE: generate local F-SEID and attach IPv4 address.
         * Prefer the IPv4 from request NodeID payload (bytes [1..4]) if present. */
     {
-        uint64_t seid_to_write = ((uint64_t)time(NULL) << 32) | (uint64_t)(rand() & 0xffffffff);
         uint32_t ip_be = 0; int has_ipv4 = 0;
         if (nodeid && nodeid_len >= 5) {
             ip_be = ((uint32_t)nodeid[1] << 24) | ((uint32_t)nodeid[2] << 16) | ((uint32_t)nodeid[3] << 8) | (uint32_t)nodeid[4];
@@ -65,7 +64,7 @@ struct pfcp_packet newPFCPEstablishmentResponse(uint32_t seq, bool s_flag, struc
             has_ipv4 = 1;
         }
         uint8_t *b = NULL; size_t bl = 0;
-        if (upf_build_fseid(seid_to_write, has_ipv4, ip_be, &b, &bl) == 0) {
+        if (upf_build_fseid(request_seid, has_ipv4, ip_be, &b, &bl) == 0) {
             parts[parts_cnt] = b; parts_len[parts_cnt] = bl; parts_cnt++;
         }
     }
