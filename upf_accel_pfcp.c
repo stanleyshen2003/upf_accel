@@ -1012,7 +1012,16 @@ static void *pfcp_thread_func(void *arg)
 
                         /* Use helper to build Session Establishment Response, then send */
                         {
-                            struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg);
+                            /* Find NodeID IE in top_ies (if present) and pass its raw payload to response builder */
+                            const uint8_t *node_payload = NULL; uint16_t node_payload_len = 0;
+                            if (top_ies) {
+                                const struct upf_ie *node_ie = upf_find_ie(top_ies, top_n, PFCP_IE_NODE_ID, 0);
+                                if (node_ie) {
+                                    node_payload = node_ie->value;
+                                    node_payload_len = (uint16_t)node_ie->len;
+                                }
+                            }
+                            struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg, node_payload, node_payload_len);
                             if (!pkt.buf || pkt.len == 0) {
                                 fprintf(stderr, "PFCP: failed to build Session Establishment Response\n");
                             } else {
