@@ -247,6 +247,19 @@ static int find_ie_in_msg(const uint8_t *buf, size_t buflen, size_t start_off, u
         uint16_t t = be16(&buf[off]);
         uint16_t l = be16(&buf[off + 2]);
         size_t po = off + PFCP_IE_HDR_LEN; /* payload offset after type/len/instance */
+        /* Debug: log parsed IE header and small payload sample */
+        {
+            unsigned inst = (unsigned)buf[off + 4];
+            printf("PFCP: parsed IE @%zu: type=%u len=%u inst=%u payload_off=%zu\n", off, (unsigned)t, (unsigned)l, inst, po);
+            if (l > 0) {
+                size_t dlen = l < 8 ? l : 8;
+                size_t i;
+                printf("PFCP: IE payload sample: ");
+                for (i = 0; i < dlen; ++i)
+                    printf("%02x", (unsigned)buf[po + i]);
+                printf("\n");
+            }
+        }
         if (po + l > buflen)
             return -1;
         if (t == ie_type) {
