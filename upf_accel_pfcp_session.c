@@ -3,6 +3,7 @@
 #include "upf_accel.h"
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <time.h>
 #include <arpa/inet.h>
