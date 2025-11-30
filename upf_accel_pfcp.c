@@ -667,15 +667,17 @@ static void *pfcp_thread_func(void *arg)
         }
 
         /* Sequence number: 3 octets, followed by 1 octet Message Priority.
-         * Advance 4 bytes after the (optional) SEID. Capture the 24-bit
-         * sequence number (big-endian). */
+         * Capture the 24-bit sequence number (big-endian) and the priority
+         * octet, then advance past the 4 bytes. */
         uint32_t seq = 0;
+        uint8_t msg_priority = 0;
         if ((size_t)n > hdr_off) {
             if ((size_t)n >= hdr_off + 4) {
                 /* 3-byte sequence number (big-endian) */
                 seq = ((uint32_t)(uint8_t)buf[hdr_off] << 16) |
                       ((uint32_t)(uint8_t)buf[hdr_off + 1] << 8) |
                       ((uint32_t)(uint8_t)buf[hdr_off + 2]);
+                msg_priority = (uint8_t)buf[hdr_off + 3];
                 /* advance past sequence (3) + message-priority (1) */
                 hdr_off += 4;
             } else {
@@ -711,11 +713,15 @@ static void *pfcp_thread_func(void *arg)
         case PFCP_MSG_ASSOCIATION_RELEASE_REQUEST:
             {
                 printf("PFCP: Association message type=%u seq=%u\n", message_type, seq);
-                /* Parse top-level IEs and look up NodeID */
+                /* Parse top-level IEs and capture NodeID payload if present. */
                 struct upf_ie *top_ies = NULL; size_t top_n = 0;
+                const uint8_t *node_payload = NULL; uint16_t node_payload_len = 0;
                 if (upf_parse_ies((const uint8_t *)buf, (size_t)n, hdr_off, &top_ies, &top_n) == 0 && top_n > 0) {
                     const struct upf_ie *node_ie = upf_find_ie(top_ies, top_n, PFCP_IE_NODE_ID, 0);
                     if (node_ie) {
+                        /* Save pointer/len to the value area (points into `buf`) */
+                        node_payload = node_ie->value;
+                        node_payload_len = (uint16_t)node_ie->len;
                         char nid[64] = {0};
                         if (upf_ie_to_nodeid(node_ie, nid, sizeof(nid)) == 0) {
                             if (!find_rnode_by_id(nid)) {
@@ -725,12 +731,28 @@ static void *pfcp_thread_func(void *arg)
                         }
                     }
                     upf_free_ies(top_ies);
+                    top_ies = NULL;
                 }
 
-                /* Build and send Association Response using helper. Current builder
-                 * accepts an 8-bit seq; pass the low byte of our 24-bit seq. */
+                /* Build and send Association Response. Prefer NodeID from request; if
+                 * absent, fall back to the local socket IPv4 address. */
                 {
-                    struct pfcp_packet pkt = newPFCPAssociationResponse(message_type, (uint8_t)seq, s_flag, NULL, 0);
+                    struct pfcp_packet pkt = { NULL, 0 };
+                    if (node_payload && node_payload_len > 0) {
+                        pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, node_payload, node_payload_len);
+                    } else if (pfcp_sock >= 0) {
+                        struct sockaddr_in local; socklen_t local_len = sizeof(local);
+                        if (getsockname(pfcp_sock, (struct sockaddr *)&local, &local_len) == 0) {
+                            uint8_t nodebuf[4];
+                            memcpy(nodebuf, &local.sin_addr.s_addr, 4);
+                            pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, nodebuf, 4);
+                        } else {
+                            pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, NULL, 0);
+                        }
+                    } else {
+                        pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, NULL, 0);
+                    }
+
                     if (!pkt.buf || pkt.len == 0) {
                         fprintf(stderr, "PFCP: failed to build Association Response\n");
                     } else {

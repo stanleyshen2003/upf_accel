@@ -108,5 +108,27 @@ int upf_parse_create_far(const struct upf_ie *ie, struct upf_parsed_far *out);
 int upf_parse_create_qer(const struct upf_ie *ie, struct upf_parsed_qer *out);
 int upf_parse_create_urr(const struct upf_ie *ie, struct upf_parsed_urr *out);
 
+/* Common IE types */
+struct upf_cause {
+	uint8_t cause; /* main cause value */
+	int has_value;
+	uint8_t value; /* optional additional information */
+};
+
+/* Parse Cause IE into upf_cause. Returns 0 on success. */
+int upf_ie_to_cause(const struct upf_ie *ie, struct upf_cause *out);
+
+/* Build a Cause IE. If has_value is 0 the IE payload is 1 byte (cause).
+ * If has_value is 1 the payload is 2 bytes (cause + value). */
+int upf_build_cause(uint8_t cause, int has_value, uint8_t value, uint8_t **out_buf, size_t *out_len);
+
+/* IE builder helpers - allocate a buffer containing a single IE (type+len+instance+value).
+ * Caller is responsible for freeing *out_buf via free(). Returns 0 on success. */
+int upf_build_ie(uint16_t ie_type, uint8_t instance, const uint8_t *value, uint16_t vlen, uint8_t **out_buf, size_t *out_len);
+
+/* Convenience builder for NodeID IE carrying an IPv4 address (vlen == 4).
+ * ip_be should be in network byte order (big-endian) as uint32_t. */
+int upf_build_nodeid_ipv4(uint32_t ip_be, uint8_t **out_buf, size_t *out_len);
+
 #endif /* UPF_ACCEL_PFCP_IE_H_ */
 

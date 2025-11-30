@@ -281,3 +281,67 @@ int upf_parse_create_urr(const struct upf_ie *ie, struct upf_parsed_urr *out)
     upf_free_ies(kids);
     return 0;
 }
+
+/* Generic IE builder: allocate buffer with Type(2) Length(2) Instance(1) Value(len)
+ * Returns 0 on success and fills *out_buf/*out_len. Caller must free *out_buf. */
+int upf_build_ie(uint16_t ie_type, uint8_t instance, const uint8_t *value, uint16_t vlen, uint8_t **out_buf, size_t *out_len)
+{
+    if (!out_buf || !out_len) return -1;
+    size_t total = PFCP_IE_HDR_LEN + vlen;
+    uint8_t *b = malloc(total);
+    if (!b) return -1;
+    /* Type (big-endian) */
+    b[0] = (uint8_t)((ie_type >> 8) & 0xff);
+    b[1] = (uint8_t)(ie_type & 0xff);
+    /* Length (big-endian) */
+    b[2] = (uint8_t)((vlen >> 8) & 0xff);
+    b[3] = (uint8_t)(vlen & 0xff);
+    /* Instance */
+    b[4] = instance;
+    if (vlen && value)
+        memcpy(&b[PFCP_IE_HDR_LEN], value, vlen);
+    *out_buf = b;
+    *out_len = total;
+    return 0;
+}
+
+/* Convenience NodeID builder for IPv4 address.
+ * ip_be: IPv4 address in network byte order (big-endian uint32_t).
+ * Produces an IE with type PFCP_IE_NODE_ID and payload 4 bytes. */
+int upf_build_nodeid_ipv4(uint32_t ip_be, uint8_t **out_buf, size_t *out_len)
+{
+    uint8_t ipv4[4];
+    ipv4[0] = (uint8_t)((ip_be >> 24) & 0xff);
+    ipv4[1] = (uint8_t)((ip_be >> 16) & 0xff);
+    ipv4[2] = (uint8_t)((ip_be >> 8) & 0xff);
+    ipv4[3] = (uint8_t)(ip_be & 0xff);
+    return upf_build_ie(PFCP_IE_NODE_ID, 0, ipv4, 4, out_buf, out_len);
+}
+
+/* Parse a Cause IE into struct upf_cause */
+int upf_ie_to_cause(const struct upf_ie *ie, struct upf_cause *out)
+{
+    if (!ie || !out) return -1;
+    if (ie->len < 1) return -1;
+    out->cause = ie->value[0];
+    if (ie->len >= 2) {
+        out->has_value = 1;
+        out->value = ie->value[1];
+    } else {
+        out->has_value = 0;
+        out->value = 0;
+    }
+    return 0;
+}
+
+/* Build Cause IE */
+int upf_build_cause(uint8_t cause, int has_value, uint8_t value, uint8_t **out_buf, size_t *out_len)
+{
+    uint8_t payload[2]; size_t plen = 1;
+    payload[0] = cause;
+    if (has_value) {
+        payload[1] = value;
+        plen = 2;
+    }
+    return upf_build_ie(PFCP_IE_CAUSE, 0, payload, (uint16_t)plen, out_buf, out_len);
+}
