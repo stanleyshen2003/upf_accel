@@ -648,8 +648,8 @@ static void *pfcp_thread_func(void *arg)
          */
         uint8_t octet1 = (uint8_t)buf[0];
         uint8_t version = octet1 >> 5;
-        bool s_flag = (octet1 & 0x10) != 0;
-        bool mp_flag = (octet1 & 0x08) != 0;
+        bool s_flag = (octet1 & 0x01) != 0;
+        bool mp_flag = (octet1 & 0x02) != 0;
         uint8_t message_type = (uint8_t)buf[1];
         uint16_t msg_len = (uint16_t)((uint8_t)buf[2] << 8 | (uint8_t)buf[3]);
 
