@@ -6,7 +6,11 @@
 #define UPF_ACCEL_PFCP_H_
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include "upf_accel.h"
+#include "upf_accel_pfcp_packet.h"
 
 /* PFCP default port */
 #define UPF_ACCEL_PFCP_PORT 8805
@@ -36,6 +40,10 @@ int upf_accel_pfcp_init(const struct upf_accel_pfcp_cfg *cfg);
 
 /* Stop PFCP listener and cleanup. */
 void upf_accel_pfcp_fini(void);
+
+/* Expose pfcp_send_response so packet builders in separate modules can send */
+int pfcp_send_response(const uint8_t *buf, size_t len, const struct sockaddr_in *dst, socklen_t dstlen);
+
 
 /* Runtime config is set via upf_accel_set_pending_smf_config() declared in upf_accel.h */
 

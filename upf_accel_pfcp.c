@@ -18,6 +18,10 @@
 #include "upf_accel.h"
 #include "upf_accel_smf_default_init.h"
 #include "upf_accel_pfcp_ie.h"
+#include "upf_accel_pfcp_packet.h"
+#include "upf_accel_pfcp_session.h"
+#include "upf_accel_pfcp_association.h"
+#include "upf_accel_pfcp_generic.h"
 #include <time.h>
 
 /* Forward declarations for endian helpers (used in parsing before their full definitions) */
@@ -567,7 +571,7 @@ static volatile bool pfcp_thread_running = false;
  * Returns: 0 on success, -1 on failure.
  */
 static void print_hex_full(const char *label, const uint8_t *buf, size_t len);
-static int pfcp_send_response(const uint8_t *buf, size_t len, const struct sockaddr_in *dst, socklen_t dstlen)
+int pfcp_send_response(const uint8_t *buf, size_t len, const struct sockaddr_in *dst, socklen_t dstlen)
 {
     ssize_t s = -1;
     if (pfcp_sock >= 0) {
@@ -616,6 +620,11 @@ static void print_hex_full(const char *label, const uint8_t *buf, size_t len)
     }
     fprintf(stdout, "\n");
 }
+
+/* Association/generic response builders are implemented in separate modules
+ * (pfcp_association.c / pfcp_generic.c) to keep packet-processing code
+ * modular and easier to maintain. */
+
 /* Minimal PFCP header (version + message type) parsing */
 struct pfcp_header {
     uint8_t version_s; /* version(3 bits) | message type? keep simple */
@@ -737,58 +746,19 @@ static void *pfcp_thread_func(void *arg)
                     }
                 }
 
-                /* Send simple Association Response (type = msg+1) with Cause accepted */
-                uint8_t rspbuf[128]; size_t ro = 0;
-                /* Mirror S flag from incoming message: include SEID only if the
-                 * incoming message had S set. Association requests typically have
-                 * S==0 so responses should not include an 8-byte SEID. */
-                uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0);
-                rspbuf[ro++] = oct1;
-                rspbuf[ro++] = (uint8_t)(message_type + 1);
-                ro += 2; /* length placeholder */
-                if (s_flag) {
-                    /* echo zero SEID when S is set (minimal impl) */
-                    for (int i = 0; i < 8; ++i) rspbuf[ro++] = 0;
-                }
-                /* sequence number, message priority and spare (3 octets per PFCP spec)
-                 * Set spare to 0x01 to match expected reference output seen in tests. */
-                rspbuf[ro++] = seq; rspbuf[ro++] = 0; rspbuf[ro++] = 1;
-
-                /* If the request carried a NodeID IE, echo it back in the response
-                 * (go-pfcp typically includes NodeID first). */
-                if (payload && plen > 0) {
-                    rspbuf[ro++] = (uint8_t)(PFCP_IE_NODE_ID >> 8);
-                    rspbuf[ro++] = (uint8_t)(PFCP_IE_NODE_ID & 0xff);
-                    rspbuf[ro++] = (uint8_t)((plen >> 8) & 0xff);
-                    rspbuf[ro++] = (uint8_t)(plen & 0xff);
-                    memcpy(&rspbuf[ro], payload, plen);
-                    ro += plen;
-                }
-
-                /* Cause IE (immediately after NodeID per go-pfcp ordering) */
-                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE >> 8);
-                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE & 0xff);
-                rspbuf[ro++] = 0; rspbuf[ro++] = 1;
-                rspbuf[ro++] = 1;
-
-                /* RecoveryTimeStamp IE (type 0x0005) - 4 bytes (seconds since epoch)
-                 * placed after Cause to match go-pfcp's typical marshaling order. */
+                /* Build and send Association Response using helper */
                 {
-                    uint32_t rts = (uint32_t)time(NULL);
-                    rspbuf[ro++] = 0x00; rspbuf[ro++] = 0x05; /* IE type 5 */
-                    rspbuf[ro++] = 0x00; rspbuf[ro++] = 0x04; /* length = 4 */
-                    rspbuf[ro++] = (uint8_t)((rts >> 24) & 0xff);
-                    rspbuf[ro++] = (uint8_t)((rts >> 16) & 0xff);
-                    rspbuf[ro++] = (uint8_t)((rts >> 8) & 0xff);
-                    rspbuf[ro++] = (uint8_t)(rts & 0xff);
+                    struct pfcp_packet pkt = newPFCPAssociationResponse(message_type, seq, s_flag, payload, plen);
+                    if (!pkt.buf || pkt.len == 0) {
+                        fprintf(stderr, "PFCP: failed to build Association Response\n");
+                    } else {
+                        if (pfcp_send_response(pkt.buf, pkt.len, &src, src_len) != 0)
+                            perror("Failed to send Association Response");
+                        else
+                            printf("Sent Association Response type=%u\n", message_type + 1);
+                        free(pkt.buf);
+                    }
                 }
-                uint16_t total_len = (uint16_t)(ro - 4);
-                rspbuf[2] = (uint8_t)((total_len >> 8) & 0xff);
-                rspbuf[3] = (uint8_t)((total_len & 0xff));
-                if (pfcp_send_response(rspbuf, ro, &src, src_len) != 0)
-                    perror("Failed to send Association Response");
-                else
-                    printf("Sent Association Response type=%u len=%zu\n", message_type + 1, ro);
             }
             break;
         case PFCP_MSG_PFD_MANAGEMENT_REQUEST:
@@ -797,27 +767,19 @@ static void *pfcp_thread_func(void *arg)
         case PFCP_MSG_SESSION_REPORT_REQUEST:
             {
                 printf("PFCP: Request type %u (simple handler) seq=%u\n", message_type, seq);
-                uint8_t rspbuf[128]; size_t ro = 0;
-                uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0);
-                rspbuf[ro++] = oct1;
-                rspbuf[ro++] = (uint8_t)(message_type + 1);
-                ro += 2;
-                if (s_flag) {
-                    for (int i = 0; i < 8; ++i) rspbuf[ro++] = 0;
+                /* Use helper to build & send a simple PFCP response */
+                {
+                    struct pfcp_packet pkt = newPFCPGenericSimpleResponse(message_type, seq, s_flag);
+                    if (!pkt.buf || pkt.len == 0) {
+                        fprintf(stderr, "PFCP: failed to build simple response\n");
+                    } else {
+                        if (pfcp_send_response(pkt.buf, pkt.len, &src, src_len) != 0)
+                            perror("Failed to send simple PFCP Response");
+                        else
+                            printf("Sent simple PFCP Response type=%u\n", message_type + 1);
+                        free(pkt.buf);
+                    }
                 }
-                /* sequence number, message priority and spare */
-                rspbuf[ro++] = seq; rspbuf[ro++] = 0; rspbuf[ro++] = 0;
-                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE >> 8);
-                rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE & 0xff);
-                rspbuf[ro++] = 0; rspbuf[ro++] = 1;
-                rspbuf[ro++] = 1;
-                uint16_t total_len = (uint16_t)(ro - 4);
-                rspbuf[2] = (uint8_t)((total_len >> 8) & 0xff);
-                rspbuf[3] = (uint8_t)((total_len & 0xff));
-                if (pfcp_send_response(rspbuf, ro, &src, src_len) != 0)
-                    perror("Failed to send simple PFCP Response");
-                else
-                    printf("Sent simple PFCP Response type=%u len=%zu\n", message_type + 1, ro);
             }
             break;
         case PFCP_MSG_SESSION_ESTABLISHMENT_REQUEST:
@@ -987,113 +949,17 @@ static void *pfcp_thread_func(void *arg)
                             }
                         }
 
-                        /* Send PFCP Session Establishment Response mirroring reference behavior */
-                        /* Build Created PDR IEs for PDRs that include UE IPv4 address */
-                        uint64_t assigned_seid = ((uint64_t)time(NULL) << 32) | (uint64_t)(rand() & 0xffffffff);
-                        /* send response */
+                        /* Use helper to build Session Establishment Response, then send */
                         {
-                            uint8_t rspbuf[2048];
-                            size_t rsp_off = 0;
-                            /* PFCP common header: octet1, msg type, length(2), SEID(8) if S set */
-                            uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0); /* version=1; S mirrors request */
-                            rspbuf[rsp_off++] = oct1;
-                            rspbuf[rsp_off++] = PFCP_MSG_SESSION_ESTABLISHMENT_RESPONSE; /* Session Establishment Response */
-                            /* reserve length */
-                            rsp_off += 2;
-                            if (s_flag) {
-                                /* write SEID (8 bytes) */
-                                for (int i = 7; i >= 0; --i) {
-                                    rspbuf[rsp_off + i] = (uint8_t)(assigned_seid & 0xff);
-                                    assigned_seid >>= 8;
-                                }
-                                rsp_off += 8;
-                            }
-                            /* sequence number, message priority and spare (3 octets) */
-                            rspbuf[rsp_off++] = seq;
-                            rspbuf[rsp_off++] = 0; /* message priority */
-                            rspbuf[rsp_off++] = 0; /* spare */
-
-                            /* Prepare IEs: CreatedPDRs for any PDR with UE IPv4, NodeID (type 60) as local IP string, Cause, F-SEID */
-                            /* CreatedPDRs */
-                            if (cfg->pdrs) {
-                                for (size_t i = 0; i < cfg->pdrs->num_pdrs; ++i) {
-                                    struct upf_accel_pdr *p = &cfg->pdrs->arr_pdrs[i];
-                                    if (p->pdi_ueip.ip_version == DOCA_FLOW_L3_TYPE_IP4) {
-                                        /* nested payload */
-                                        uint8_t nested[64];
-                                        size_t noff = 0;
-                                        /* PDR ID IE */
-                                        nested[noff++] = (uint8_t)(PFCP_IE_PDR_ID >> 8);
-                                        nested[noff++] = (uint8_t)(PFCP_IE_PDR_ID & 0xff);
-                                        nested[noff++] = 0; nested[noff++] = 4;
-                                        nested[noff++] = (uint8_t)((p->id >> 24) & 0xff);
-                                        nested[noff++] = (uint8_t)((p->id >> 16) & 0xff);
-                                        nested[noff++] = (uint8_t)((p->id >> 8) & 0xff);
-                                        nested[noff++] = (uint8_t)(p->id & 0xff);
-                                        /* UE IP IE */
-                                        nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS >> 8);
-                                        nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS & 0xff);
-                                        nested[noff++] = 0; nested[noff++] = 4;
-                                        uint32_t uip = p->pdi_ueip.addr.v4;
-                                        nested[noff++] = (uint8_t)((uip >> 24) & 0xff);
-                                        nested[noff++] = (uint8_t)((uip >> 16) & 0xff);
-                                        nested[noff++] = (uint8_t)((uip >> 8) & 0xff);
-                                        nested[noff++] = (uint8_t)(uip & 0xff);
-
-                                        /* Write CreatedPDR IE header */
-                                        rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_CREATED_PDR >> 8);
-                                        rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_CREATED_PDR & 0xff);
-                                        rspbuf[rsp_off++] = (uint8_t)((noff >> 8) & 0xff);
-                                        rspbuf[rsp_off++] = (uint8_t)(noff & 0xff);
-                                        memcpy(&rspbuf[rsp_off], nested, noff);
-                                        rsp_off += noff;
-                                    }
-                                }
-                            }
-
-                            /* NodeID IE (type 60) - include local IPv4 if available */
-                            uint32_t local_ip = inet_addr("127.0.0.1");
-                            rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_NODE_ID >> 8);
-                            rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_NODE_ID & 0xff);
-                            rspbuf[rsp_off++] = 0; rspbuf[rsp_off++] = 4;
-                            rspbuf[rsp_off++] = (uint8_t)((local_ip >> 24) & 0xff);
-                            rspbuf[rsp_off++] = (uint8_t)((local_ip >> 16) & 0xff);
-                            rspbuf[rsp_off++] = (uint8_t)((local_ip >> 8) & 0xff);
-                            rspbuf[rsp_off++] = (uint8_t)(local_ip & 0xff);
-
-                            /* Cause IE */
-                            rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_CAUSE >> 8);
-                            rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_CAUSE & 0xff);
-                            rspbuf[rsp_off++] = 0; rspbuf[rsp_off++] = 1;
-                            rspbuf[rsp_off++] = 1; /* Request accepted */
-
-                            /* F-SEID IE (type 57) - include SEID and IPv4 */
-                            uint64_t seid_to_write = ((uint64_t)time(NULL) << 32) | (uint64_t)(rand() & 0xffffffff);
-                            rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_FSEID >> 8);
-                            rspbuf[rsp_off++] = (uint8_t)(PFCP_IE_FSEID & 0xff);
-                            rspbuf[rsp_off++] = 0; rspbuf[rsp_off++] = 12;
-                            for (int i = 7; i >= 0; --i) {
-                                rspbuf[rsp_off + i] = (uint8_t)(seid_to_write & 0xff);
-                                seid_to_write >>= 8;
-                            }
-                            rsp_off += 8;
-                            /* write IPv4 */
-                            uint32_t ip4 = inet_addr("127.0.0.1");
-                            rspbuf[rsp_off++] = (uint8_t)((ip4 >> 24) & 0xff);
-                            rspbuf[rsp_off++] = (uint8_t)((ip4 >> 16) & 0xff);
-                            rspbuf[rsp_off++] = (uint8_t)((ip4 >> 8) & 0xff);
-                            rspbuf[rsp_off++] = (uint8_t)(ip4 & 0xff);
-
-                            /* fill length (total length minus first 4 bytes) */
-                            uint16_t total_len = (uint16_t)(rsp_off - 4);
-                            rspbuf[2] = (uint8_t)((total_len >> 8) & 0xff);
-                            rspbuf[3] = (uint8_t)(total_len & 0xff);
-
-                            /* send to source */
-                            if (pfcp_send_response(rspbuf, rsp_off, &src, src_len) != 0) {
-                                perror("Failed to send PFCP Session Establishment Response");
+                            struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg);
+                            if (!pkt.buf || pkt.len == 0) {
+                                fprintf(stderr, "PFCP: failed to build Session Establishment Response\n");
                             } else {
-                                printf("Sent PFCP Session Establishment Response (len=%zu)\n", rsp_off);
+                                if (pfcp_send_response(pkt.buf, pkt.len, &src, src_len) != 0)
+                                    perror("Failed to send PFCP Session Establishment Response");
+                                else
+                                    printf("Sent PFCP Session Establishment Response\n");
+                                free(pkt.buf);
                             }
                         }
                     }
