@@ -560,6 +560,11 @@ void upf_accel_smf_cleanup(struct upf_accel_config *cfg);
  */
 void upf_accel_vxlan_cleanup(struct upf_accel_config *cfg);
 
+/* Set a pending SMF configuration to be applied by main thread. The caller
+ * passes ownership of the pointer; main will free/cleanup previous config and
+ * integrate the new one. Returns 0 on success. */
+int upf_accel_set_pending_smf_config(struct upf_accel_config *cfg);
+
 /*
  * Init the SW Aging doubly linked list head & tail
  *

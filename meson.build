@@ -29,6 +29,7 @@ app_srcs = [
 	APP_NAME + '_flow_processing.c',
 	APP_NAME + '_print_header.c',
 	APP_NAME + '_smf_default_init.c',
+	APP_NAME + '_pfcp.c',
 	common_dir_path + '/dpdk_utils.c',
 	common_dir_path + '/packet_parser.c',
 	samples_dir_path + '/common.c',
@@ -43,7 +44,7 @@ app_dependencies += dependency('json-c')
 
 executable(DOCA_PREFIX + APP_NAME,
 	app_srcs,
-	c_args : base_c_args,
+	c_args : base_c_args + ['-pthread'],
 	dependencies : app_dependencies,
 	include_directories: app_inc_dirs,
 	install: install_apps)

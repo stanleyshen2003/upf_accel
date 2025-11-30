@@ -40,6 +40,8 @@
 #include "upf_accel.h"
 #include "upf_accel_flow_processing.h"
 #include "upf_accel_pipeline.h"
+#include "upf_accel_pfcp.h"
+#include <pthread.h>
 
 DOCA_LOG_REGISTER(UPF_ACCEL);
 
@@ -1415,6 +1417,93 @@ cleanup_doca_flow:
 	return result;
 }
 
+/* Pending SMF configuration set by PFCP handler; applied by main thread on SIGUSR2 */
+static pthread_mutex_t pending_smf_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct upf_accel_config *pending_smf_cfg = NULL;
+
+int upf_accel_set_pending_smf_config(struct upf_accel_config *cfg)
+{
+	if (!cfg)
+		return -1;
+
+	pthread_mutex_lock(&pending_smf_lock);
+	if (pending_smf_cfg) {
+		/* cleanup previous pending config */
+		upf_accel_smf_cleanup(pending_smf_cfg);
+		free(pending_smf_cfg);
+	}
+	pending_smf_cfg = cfg;
+	pthread_mutex_unlock(&pending_smf_lock);
+
+	DOCA_LOG_INFO("Pending SMF config stored, will apply on SIGUSR2");
+	return 0;
+}
+
+/* Apply pending SMF config (called from main thread) */
+static doca_error_t upf_accel_apply_pending_smf_cfg(struct upf_accel_ctx *upf_accel_ctx,
+												   struct upf_accel_fp_data *fp_data_arr)
+{
+	struct upf_accel_config *cfg = NULL;
+	doca_error_t result = DOCA_SUCCESS;
+	enum upf_accel_port port_id;
+
+	pthread_mutex_lock(&pending_smf_lock);
+	if (!pending_smf_cfg) {
+		pthread_mutex_unlock(&pending_smf_lock);
+		DOCA_LOG_INFO("No pending SMF config to apply");
+		return DOCA_SUCCESS;
+	}
+	cfg = pending_smf_cfg;
+	pending_smf_cfg = NULL;
+	pthread_mutex_unlock(&pending_smf_lock);
+
+	DOCA_LOG_INFO("Applying pending SMF configuration");
+
+	/* Cleanup current SMF arrays (keep top-level cfg struct if stack-allocated),
+	 * then copy the pending cfg contents into the existing top-level struct. */
+	struct upf_accel_config *cur_cfg = upf_accel_ctx->upf_accel_cfg;
+	upf_accel_smf_cleanup(cur_cfg);
+
+	/* Copy ownership of dynamically allocated arrays from cfg into cur_cfg */
+	*cur_cfg = *cfg;
+	/* Free the temporary container (we moved its pointers) */
+	free(cfg);
+
+	/* Initialize shared meters for the new config */
+	result = upf_accel_shared_meters_init(upf_accel_ctx);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to init shared meters for new SMF config: %s", doca_error_get_descr(result));
+		return result;
+	}
+
+	/* Add SMF related rules (PDR/FAR/QER/URR) */
+	result = upf_accel_smf_rules_add(upf_accel_ctx);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to add SMF rules for new config: %s", doca_error_get_descr(result));
+		return result;
+	}
+
+	/* Process the newly added entries on each port */
+	for (port_id = 0; port_id < upf_accel_ctx->num_ports; port_id++) {
+		struct entries_status *ctrl_status = &upf_accel_ctx->static_entry_ctx[port_id].static_ctx.ctrl_status;
+
+		result = doca_flow_entries_process(upf_accel_ctx->ports[port_id], 0, DEFAULT_TIMEOUT_US,
+										   upf_accel_ctx->num_static_entries[port_id]);
+		if (result != DOCA_SUCCESS) {
+			DOCA_LOG_ERR("Failed to process entries on port %u: %s", port_id, doca_error_get_descr(result));
+			return result;
+		}
+
+		if (ctrl_status->nb_processed != (int)upf_accel_ctx->num_static_entries[port_id] || ctrl_status->failure) {
+			DOCA_LOG_ERR("Failed to process port %u entries during SMF apply", port_id);
+			return DOCA_ERROR_UNKNOWN;
+		}
+	}
+
+	DOCA_LOG_INFO("Successfully applied pending SMF configuration");
+	return DOCA_SUCCESS;
+}
+
 /*
  * UPF Acceleration application logic
  *
@@ -1463,6 +1552,12 @@ static doca_error_t run_upf_accel(struct upf_accel_ctx *upf_accel_ctx, struct up
 			break;
 		case SIGUSR1:
 			upf_accel_debug_counters_print(upf_accel_ctx, fp_data_arr);
+			break;
+		case SIGUSR2:
+			DOCA_LOG_INFO("SIGUSR2 received: applying pending SMF configuration if present");
+			/* Attempt to apply pending SMF config set by PFCP handler */
+			if (upf_accel_apply_pending_smf_cfg(upf_accel_ctx, fp_data_arr) != DOCA_SUCCESS)
+				DOCA_LOG_ERR("Failed to apply pending SMF config");
 			break;
 		default:
 			DOCA_LOG_WARN("Polled unexpected signal %d", sig);
@@ -1882,6 +1977,15 @@ int main(int argc, char **argv)
 		goto dpdk_vxlan_cleanup;
 	}
 
+	/* Start PFCP listener (N4) so we can receive control messages at runtime. */
+	{
+		struct upf_accel_pfcp_cfg pfcp_cfg = {.bind_addr = NULL, .port = UPF_ACCEL_PFCP_PORT};
+		if (upf_accel_pfcp_init(&pfcp_cfg) != 0) {
+			DOCA_LOG_ERR("Failed to start PFCP listener");
+			/* Not fatal for now; continue without PFCP */
+		}
+	}
+
 	result = run_upf_accel(&upf_accel_ctx, fp_data_arr);
 	if (result != DOCA_SUCCESS) {
 		DOCA_LOG_ERR("run_upf_accel() encountered an error: %s", doca_error_get_descr(result));
@@ -1890,6 +1994,8 @@ int main(int argc, char **argv)
 
 	exit_status = EXIT_SUCCESS;
 upf_accel_deinit:
+	/* Stop PFCP listener first to avoid control messages during deinit */
+	upf_accel_pfcp_fini();
 	result = deinit_upf_accel(&upf_accel_ctx, fp_data_arr);
 	if (result != DOCA_SUCCESS) {
 		DOCA_LOG_ERR("deinit_upf_accel() encountered an error: %s", doca_error_get_descr(result));
