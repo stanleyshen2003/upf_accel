@@ -911,11 +911,84 @@ static void *pfcp_thread_func(void *arg)
                     } else {
                         printf("Pending SMF config stored (pdrs=%zu fars=%zu qers=%zu urrs=%zu)\n",
                                 pdr_idx, far_idx, qer_idx, urr_idx);
-                        /* Notify main thread to apply the pending config via SIGUSR2 */
-                        if (kill(getpid(), SIGUSR2) != 0) {
-                            perror("Failed to signal main process for SMF apply");
-                        } else {
-                            printf("Signalled main to apply pending SMF config\n");
+
+                        /* Print details of the stored SMF config for debugging/visibility */
+                        printf("PFCP: SMF config details:\n");
+                        if (cfg->pdrs && cfg->pdrs->num_pdrs) {
+                            for (size_t pi = 0; pi < cfg->pdrs->num_pdrs; ++pi) {
+                                struct upf_accel_pdr *p = &cfg->pdrs->arr_pdrs[pi];
+                                printf(" PDR[%zu]: id=%u farid=%u pdi_qfi=%u pdi_si=%u\n",
+                                        pi, p->id, p->farid, p->pdi_qfi, p->pdi_si);
+                                if (p->pdi_ueip.mask.v4 != 0) {
+                                    struct in_addr a; a.s_addr = htonl(p->pdi_ueip.addr.v4);
+                                    printf("  UE IP: %s\n", inet_ntoa(a));
+                                }
+                                if (p->urrids_num) {
+                                    printf("  URR IDs:");
+                                    for (size_t u = 0; u < p->urrids_num; ++u)
+                                        printf(" %u", p->urrids[u]);
+                                    printf("\n");
+                                }
+                                if (p->qerids_num) {
+                                    printf("  QER IDs:");
+                                    for (size_t q = 0; q < p->qerids_num; ++q)
+                                        printf(" %u", p->qerids[q]);
+                                    printf("\n");
+                                }
+                            }
+                        }
+                        if (cfg->fars && cfg->fars->num_fars) {
+                            for (size_t fi = 0; fi < cfg->fars->num_fars; ++fi) {
+                                struct upf_accel_far *f = &cfg->fars->arr_fars[fi];
+                                printf(" FAR[%zu]: id=%u", fi, f->id);
+                                if (f->fp_oh_teid != 0)
+                                    printf(" teid=0x%08x", f->fp_oh_teid);
+                                if (f->fp_oh_ip.mask.v4 != 0) {
+                                    struct in_addr a; a.s_addr = htonl(f->fp_oh_ip.addr.v4);
+                                    printf(" ip=%s", inet_ntoa(a));
+                                }
+                                printf("\n");
+                            }
+                        }
+                        if (cfg->qers && cfg->qers->num_qers) {
+                            for (size_t qi = 0; qi < cfg->qers->num_qers; ++qi) {
+                                struct upf_accel_qer *q = &cfg->qers->arr_qers[qi];
+                                printf(" QER[%zu]: id=%u qfi=%u mbr_dl=%llu\n",
+                                        qi, q->id, q->qfi, (unsigned long long)q->mbr_dl_mbr);
+                            }
+                        }
+                        if (cfg->urrs && cfg->urrs->num_urrs) {
+                            for (size_t ui = 0; ui < cfg->urrs->num_urrs; ++ui) {
+                                struct upf_accel_urr *u = &cfg->urrs->arr_urrs[ui];
+                                printf(" URR[%zu]: id=%u vol_quota_total=%llu\n",
+                                        ui, u->id, (unsigned long long)u->volume_quota_total_volume);
+                            }
+                        }
+
+                        /* Notify main thread to apply the pending config via SIGUSR2.
+                         * Avoid sending the signal if no handler is installed (would
+                         * terminate the process). Query current disposition first. */
+                        {
+                            struct sigaction oldsa;
+                            if (sigaction(SIGUSR2, NULL, &oldsa) == 0) {
+                                if (oldsa.sa_handler == SIG_DFL) {
+                                    printf("PFCP: no SIGUSR2 handler installed; skipping signal to avoid termination\n");
+                                } else {
+                                    if (kill(getpid(), SIGUSR2) != 0) {
+                                        perror("Failed to signal main process for SMF apply");
+                                    } else {
+                                        printf("Signalled main to apply pending SMF config\n");
+                                    }
+                                }
+                            } else {
+                                perror("sigaction");
+                                /* Best-effort: try signalling anyway */
+                                if (kill(getpid(), SIGUSR2) != 0) {
+                                    perror("Failed to signal main process for SMF apply");
+                                } else {
+                                    printf("Signalled main to apply pending SMF config\n");
+                                }
+                            }
                         }
                         /* Register session (if SEID present) */
                         {
