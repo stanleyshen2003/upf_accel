@@ -707,17 +707,27 @@ static void *pfcp_thread_func(void *arg)
             hdr_off += 8;
         }
 
-        /* Sequence number (1 octet), Message Priority (1 octet) and Spare (1 octet)
-         * PFCP uses three octets after the (optional) SEID. Advance carefully
-         * and capture the sequence number from the first of those octets. */
-        uint8_t seq = 0;
-        if (n > (int)hdr_off) {
-            seq = (uint8_t)buf[hdr_off];
-            /* advance past sequence + message-priority + spare (3 bytes) */
-            if ((size_t)n >= hdr_off + 3)
-                hdr_off += 3;
-            else
+        /* Sequence number: 3 octets, followed by 1 octet Message Priority.
+         * Advance 4 bytes after the (optional) SEID. Capture the 24-bit
+         * sequence number (big-endian). */
+        uint32_t seq = 0;
+        if ((size_t)n > hdr_off) {
+            if ((size_t)n >= hdr_off + 4) {
+                /* 3-byte sequence number (big-endian) */
+                seq = ((uint32_t)(uint8_t)buf[hdr_off] << 16) |
+                      ((uint32_t)(uint8_t)buf[hdr_off + 1] << 8) |
+                      ((uint32_t)(uint8_t)buf[hdr_off + 2]);
+                /* advance past sequence (3) + message-priority (1) */
+                hdr_off += 4;
+            } else {
+                /* packet truncated; read available bytes into seq */
+                size_t avail = (size_t)n - hdr_off;
+                uint32_t s = 0;
+                for (size_t i = 0; i < avail && i < 3; ++i)
+                    s = (s << 8) | (uint8_t)buf[hdr_off + i];
+                seq = s;
                 hdr_off = (size_t)n;
+            }
         }
 
         /* Record rx transaction for this request to correlate responses */
