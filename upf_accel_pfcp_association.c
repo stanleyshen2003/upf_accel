@@ -54,7 +54,7 @@ struct pfcp_packet newPFCPAssociationResponse(uint8_t req_msg_type, uint32_t seq
     }
 
     size_t ro = 0;
-    uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0);
+    uint8_t oct1 = (1 << 5) | (s_flag ? 0x01 : 0);
     rspbuf[ro++] = oct1;
     rspbuf[ro++] = (uint8_t)(req_msg_type + 1);
     ro += 2; /* length placeholder */

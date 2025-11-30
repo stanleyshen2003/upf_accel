@@ -1021,7 +1021,18 @@ static void *pfcp_thread_func(void *arg)
                                     node_payload_len = (uint16_t)node_ie->len;
                                 }
                             }
-                            struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg, node_payload, node_payload_len);
+                            /* Parse F-SEID IE from request (if present) and use its SEID in response header */
+                            uint64_t request_seid = 0;
+                            if (top_ies) {
+                                const struct upf_ie *fie = upf_find_ie(top_ies, top_n, PFCP_IE_FSEID, 0);
+                                if (fie) {
+                                    int has_ipv4 = 0; uint32_t ipv4 = 0;
+                                    if (upf_ie_to_fseid(fie, &request_seid, &has_ipv4, &ipv4) != 0) {
+                                        request_seid = 0;
+                                    }
+                                }
+                            }
+                            struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg, node_payload, node_payload_len, request_seid);
                             if (!pkt.buf || pkt.len == 0) {
                                 fprintf(stderr, "PFCP: failed to build Session Establishment Response\n");
                             } else {
