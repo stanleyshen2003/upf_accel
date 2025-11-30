@@ -334,9 +334,9 @@ int upf_build_fseid(uint64_t seid, int has_ipv4, uint32_t ipv4_be, uint8_t **out
     /* Layout: 1 byte flags, 8 bytes SEID (big-endian), optional 4 bytes IPv4
      * Total length = 9 (no IPv4) or 13 (with IPv4) */
     uint8_t tmp[13]; size_t plen = 9;
-    /* flags: bit 7 (0x40) = IPv4 present, bit 8 (0x80) = IPv6 present */
+
     uint8_t flags = 0;
-    if (has_ipv4) flags |= 0x40;
+    if (has_ipv4) flags |= 0x02;
     tmp[0] = flags;
 
     /* write SEID into tmp[1..8] (big-endian) */
