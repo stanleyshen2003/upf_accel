@@ -566,11 +566,14 @@ static volatile bool pfcp_thread_running = false;
  *
  * Returns: 0 on success, -1 on failure.
  */
+static void print_hex_full(const char *label, const uint8_t *buf, size_t len);
 static int pfcp_send_response(const uint8_t *buf, size_t len, const struct sockaddr_in *dst, socklen_t dstlen)
 {
     ssize_t s = -1;
     if (pfcp_sock >= 0) {
         printf("PFCP: attempting sendto on global socket fd=%d len=%zu\n", pfcp_sock, len);
+        /* Log outgoing bytes in hex for debugging */
+        print_hex_full("PFCP: outgoing (hex)", buf, len);
         s = sendto(pfcp_sock, (const char *)buf, (int)len, 0, (const struct sockaddr *)dst, dstlen);
         if (s >= 0)
             return 0;
@@ -587,6 +590,8 @@ static int pfcp_send_response(const uint8_t *buf, size_t len, const struct socka
         return -1;
     }
     printf("PFCP: using fallback socket fd=%d to send len=%zu\n", tmp, len);
+    /* Log outgoing bytes when using fallback as well */
+    print_hex_full("PFCP: fallback outgoing (hex)", buf, len);
     ssize_t st = sendto(tmp, (const char *)buf, (int)len, 0, (const struct sockaddr *)dst, dstlen);
     if (st < 0) {
         fprintf(stderr, "PFCP: fallback sendto failed: %s\n", strerror(errno));
@@ -598,6 +603,19 @@ static int pfcp_send_response(const uint8_t *buf, size_t len, const struct socka
     return 0;
 }
 
+/* Helper to print entire buffer as hex with length prefix.
+ * Use this instead of ad-hoc loops that truncate output to 64 bytes.
+ */
+static void print_hex_full(const char *label, const uint8_t *buf, size_t len)
+{
+    size_t i;
+    if (!label) label = "HEX";
+    fprintf(stdout, "%s (len=%zu): ", label, len);
+    for (i = 0; i < len; ++i) {
+        fprintf(stdout, "%02x", (unsigned char)buf[i]);
+    }
+    fprintf(stdout, "\n");
+}
 /* Minimal PFCP header (version + message type) parsing */
 struct pfcp_header {
     uint8_t version_s; /* version(3 bits) | message type? keep simple */
@@ -622,6 +640,8 @@ static void *pfcp_thread_func(void *arg)
             break;
         }
         printf("PFCP: recvfrom returned n=%d on socket fd=%d from %s:%d\n", n, pfcp_sock, inet_ntoa(src.sin_addr), ntohs(src.sin_port));
+        /* Dump full received packet for debugging */
+        print_hex_full("PFCP: incoming (hex)", (const uint8_t *)buf, (size_t)n);
         if (n < (int)sizeof(struct pfcp_header)) {
             fprintf(stderr, "PFCP packet too small: %d\n", n);
             continue;
@@ -683,15 +703,15 @@ static void *pfcp_thread_func(void *arg)
                (unsigned long long)seid, seq);
 
         switch (message_type) {
-        case 1: /* Heartbeat Request */
+        case PFCP_MSG_HEARTBEAT_REQUEST:
             printf("PFCP: Heartbeat Request\n");
             break;
-        case 2: /* Heartbeat Response */
+        case PFCP_MSG_HEARTBEAT_RESPONSE:
             printf("PFCP: Heartbeat Response\n");
             break;
-        case 5: /* Association Setup Request */
-        case 7: /* Association Update Request */
-        case 9: /* Association Release Request */
+        case PFCP_MSG_ASSOCIATION_SETUP_REQUEST:
+        case PFCP_MSG_ASSOCIATION_UPDATE_REQUEST:
+        case PFCP_MSG_ASSOCIATION_RELEASE_REQUEST:
             {
                 printf("PFCP: Association message type=%u seq=%u\n", message_type, seq);
                 /* Try to extract NodeID IE and register remote node */
@@ -743,10 +763,10 @@ static void *pfcp_thread_func(void *arg)
                     printf("Sent Association Response type=%u len=%zu\n", message_type + 1, ro);
             }
             break;
-        case 3: /* PFD Management Request */
-        case 12: /* Node Report Request */
-        case 14: /* Session Set Deletion Request */
-        case 56: /* Session Report Request */
+        case PFCP_MSG_PFD_MANAGEMENT_REQUEST:
+        case PFCP_MSG_NODE_REPORT_REQUEST:
+        case PFCP_MSG_SESSION_SET_DELETION_REQUEST:
+        case PFCP_MSG_SESSION_REPORT_REQUEST:
             {
                 printf("PFCP: Request type %u (simple handler) seq=%u\n", message_type, seq);
                 uint8_t rspbuf[128]; size_t ro = 0;
@@ -771,7 +791,7 @@ static void *pfcp_thread_func(void *arg)
                     printf("Sent simple PFCP Response type=%u len=%zu\n", message_type + 1, ro);
             }
             break;
-        case 50: /* Session Establishment Request */
+        case PFCP_MSG_SESSION_ESTABLISHMENT_REQUEST:
             /*
              * PFCP Session Establishment Request (Message Type 50)
              * Steps performed below:
@@ -948,7 +968,7 @@ static void *pfcp_thread_func(void *arg)
                             /* PFCP common header: octet1, msg type, length(2), SEID(8) if S set */
                             uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0); /* version=1; S mirrors request */
                             rspbuf[rsp_off++] = oct1;
-                            rspbuf[rsp_off++] = 51; /* Session Establishment Response */
+                            rspbuf[rsp_off++] = PFCP_MSG_SESSION_ESTABLISHMENT_RESPONSE; /* Session Establishment Response */
                             /* reserve length */
                             rsp_off += 2;
                             if (s_flag) {
