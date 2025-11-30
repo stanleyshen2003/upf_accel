@@ -30,7 +30,7 @@ struct pfcp_packet newPFCPAssociationResponse(uint8_t req_msg_type, uint32_t seq
         }
     }
 
-    /* Recovery Time Stamp IE (4-byte UNIX time). IEType 0x0005 used previously. */
+    /* Recovery Time Stamp IE (4-byte UNIX time). Use defined IE constant. */
     {
         uint32_t rts = (uint32_t)time(NULL);
         uint8_t rtsb[4];
@@ -39,7 +39,7 @@ struct pfcp_packet newPFCPAssociationResponse(uint8_t req_msg_type, uint32_t seq
         rtsb[2] = (uint8_t)((rts >> 8) & 0xff);
         rtsb[3] = (uint8_t)(rts & 0xff);
         uint8_t *b = NULL; size_t bl = 0;
-        if (upf_build_ie(0x0005, rtsb, 4, &b, &bl) == 0) {
+        if (upf_build_ie(PFCP_IE_RECOVERY_TIME_STAMP, rtsb, 4, &b, &bl) == 0) {
             parts[parts_cnt] = b; parts_len[parts_cnt] = bl; parts_cnt++;
         }
     }
