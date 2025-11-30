@@ -824,6 +824,11 @@ static void *pfcp_thread_func(void *arg)
                 }
             }
 
+            printf("Top-level IEs parsed: %zu\n", top_n);
+            for (size_t i = 0; i < top_n; ++i) {
+                printf(" IE[%zu]: type=%u len=%zu\n", i, top_ies[i].type, top_ies[i].len);
+            }
+
             if (num_pdrs == 0 && num_fars == 0 && num_qers == 0 && num_urrs == 0) {
                 printf("No Create* IEs found, skipping SMF apply\n");
             } else {
