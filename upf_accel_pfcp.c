@@ -716,12 +716,18 @@ static void *pfcp_thread_func(void *arg)
 
                 /* Send simple Association Response (type = msg+1) with Cause accepted */
                 uint8_t rspbuf[128]; size_t ro = 0;
-                uint8_t oct1 = (1 << 5) | 0x10;
+                /* Mirror S flag from incoming message: include SEID only if the
+                 * incoming message had S set. Association requests typically have
+                 * S==0 so responses should not include an 8-byte SEID. */
+                uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0);
                 rspbuf[ro++] = oct1;
                 rspbuf[ro++] = (uint8_t)(message_type + 1);
                 ro += 2; /* length placeholder */
-                /* SEID in assoc responses is zero per minimal impl */
-                for (int i = 0; i < 8; ++i) rspbuf[ro++] = 0;
+                if (s_flag) {
+                    /* echo zero SEID when S is set (minimal impl) */
+                    for (int i = 0; i < 8; ++i) rspbuf[ro++] = 0;
+                }
+                /* sequence number and spare/priority */
                 rspbuf[ro++] = seq; rspbuf[ro++] = 0;
                 /* Cause IE */
                 rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE >> 8);
@@ -744,11 +750,13 @@ static void *pfcp_thread_func(void *arg)
             {
                 printf("PFCP: Request type %u (simple handler) seq=%u\n", message_type, seq);
                 uint8_t rspbuf[128]; size_t ro = 0;
-                uint8_t oct1 = (1 << 5) | 0x10;
+                uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0);
                 rspbuf[ro++] = oct1;
                 rspbuf[ro++] = (uint8_t)(message_type + 1);
                 ro += 2;
-                for (int i = 0; i < 8; ++i) rspbuf[ro++] = 0;
+                if (s_flag) {
+                    for (int i = 0; i < 8; ++i) rspbuf[ro++] = 0;
+                }
                 rspbuf[ro++] = seq; rspbuf[ro++] = 0;
                 rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE >> 8);
                 rspbuf[ro++] = (uint8_t)(PFCP_IE_CAUSE & 0xff);
@@ -938,17 +946,19 @@ static void *pfcp_thread_func(void *arg)
                             uint8_t rspbuf[2048];
                             size_t rsp_off = 0;
                             /* PFCP common header: octet1, msg type, length(2), SEID(8) if S set */
-                            uint8_t oct1 = (1 << 5) | 0x10; /* version=1, S=1 */
+                            uint8_t oct1 = (1 << 5) | (s_flag ? 0x10 : 0); /* version=1; S mirrors request */
                             rspbuf[rsp_off++] = oct1;
                             rspbuf[rsp_off++] = 51; /* Session Establishment Response */
                             /* reserve length */
                             rsp_off += 2;
-                            /* write SEID (8 bytes) */
-                            for (int i = 7; i >= 0; --i) {
-                                rspbuf[rsp_off + i] = (uint8_t)(assigned_seid & 0xff);
-                                assigned_seid >>= 8;
+                            if (s_flag) {
+                                /* write SEID (8 bytes) */
+                                for (int i = 7; i >= 0; --i) {
+                                    rspbuf[rsp_off + i] = (uint8_t)(assigned_seid & 0xff);
+                                    assigned_seid >>= 8;
+                                }
+                                rsp_off += 8;
                             }
-                            rsp_off += 8;
                             /* sequence number */
                             rspbuf[rsp_off++] = seq;
                             /* spare/priority */
