@@ -79,15 +79,13 @@ struct pfcp_packet newPFCPEstablishmentResponse(uint32_t seq, bool s_flag, struc
                 /* PDR ID IE */
                 nested[noff++] = (uint8_t)(PFCP_IE_PDR_ID >> 8);
                 nested[noff++] = (uint8_t)(PFCP_IE_PDR_ID & 0xff);
-                nested[noff++] = 0; nested[noff++] = 4;
-                nested[noff++] = (uint8_t)((p->id >> 24) & 0xff);
-                nested[noff++] = (uint8_t)((p->id >> 16) & 0xff);
+                nested[noff++] = 0; nested[noff++] = 2;
                 nested[noff++] = (uint8_t)((p->id >> 8) & 0xff);
                 nested[noff++] = (uint8_t)(p->id & 0xff);
                 /* UE IP address IE */
                 nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS >> 8);
                 nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS & 0xff);
-                nested[noff++] = 0; nested[noff++] = 4;
+                nested[noff++] = 0; nested[noff++] = 5;
                 uint32_t uip = p->pdi_ueip.addr.v4;
                 nested[noff++] = (uint8_t)((uip >> 24) & 0xff);
                 nested[noff++] = (uint8_t)((uip >> 16) & 0xff);
