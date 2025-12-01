@@ -458,8 +458,10 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
             break;
         switch (t) {
         case PFCP_IE_PDR_ID:
-            if (l >= 4)
+            if (l >= 4) {
                 pdr->id = be32(&payload[po]);
+            }
+            printf("Parsing CreatePDR IE for PDR ID %u\n", pdr->id);
             break;
         case PFCP_IE_FAR_ID:
             if (l >= 4)
