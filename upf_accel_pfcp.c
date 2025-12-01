@@ -521,7 +521,7 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
         default:
             break;
         }
-        off = po + l;
+        off = po + l + PFCP_IE_HDR_LEN;
     }
 }
 

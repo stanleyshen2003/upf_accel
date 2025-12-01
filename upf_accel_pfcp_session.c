@@ -82,6 +82,7 @@ struct pfcp_packet newPFCPEstablishmentResponse(uint32_t seq, bool s_flag, struc
                 nested[noff++] = 0; nested[noff++] = 2;
                 nested[noff++] = (uint8_t)((p->id >> 8) & 0xff);
                 nested[noff++] = (uint8_t)(p->id & 0xff);
+                printf("Adding Created PDR IE for PDR ID %u with UE IP 0x%08x\n", p->id, p->pdi_ueip.addr.v4);
                 /* UE IP address IE */
                 nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS >> 8);
                 nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS & 0xff);
