@@ -449,10 +449,12 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
 {
     memset(pdr, 0, sizeof(*pdr));
     pdr->pdi_qfi = 0;
+    printf("parse_create_pdr: len=%zu\n", len);
     size_t off = 0;
     while (off + PFCP_IE_HDR_LEN <= len) {
         uint16_t t = be16(&payload[off]);
         uint16_t l = be16(&payload[off + 2]);
+        printf("  CreatePDR child: type=%u len=%u off=%zu\n", t, l, off);
         size_t po = off + PFCP_IE_HDR_LEN;
         if (po + l > len)
             break;
@@ -475,9 +477,12 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
                 while (ipoff + PFCP_IE_HDR_LEN <= ipend) {
                     uint16_t it = be16(&payload[ipoff]);
                     uint16_t il = be16(&payload[ipoff + 2]);
+                    printf("  PDI child: type=%u len=%u off=%zu\n", it, il, ipoff);
                     size_t ip = ipoff + PFCP_IE_HDR_LEN;
-                    if (ip + il > ipend)
+                    if (ip + il > ipend) {
+                        printf("  PDI child overflow: ip=%zu il=%u ipend=%zu\n", ip, il, ipend);
                         break;
+                    }
                     switch (it) {
                     case PFCP_IE_SOURCE_INTERFACE:
                         if (il >= 1) {
@@ -489,11 +494,14 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
                         }
                         break;
                     case PFCP_IE_UE_IP_ADDRESS:
-                        if (il >= 4) {
-                            /* assume IPv4 address in first 4 bytes */
-                            pdr->pdi_ueip.addr.v4 = be32(&payload[ip]);
-                            pdr->pdi_ueip.mask.v4 = 0xFFFFFFFF;
-                            pdr->pdi_ueip.ip_version = DOCA_FLOW_L3_TYPE_IP4;
+                        if (il >= 5) {
+                            uint8_t flags = payload[ip];
+                            if (flags & 0x02) { /* V4 */
+                                pdr->pdi_ueip.addr.v4 = be32(&payload[ip + 1]);
+                                pdr->pdi_ueip.mask.v4 = 0xFFFFFFFF;
+                                pdr->pdi_ueip.ip_version = DOCA_FLOW_L3_TYPE_IP4;
+                                printf("Parsed UE IP (v4): 0x%08x\n", pdr->pdi_ueip.addr.v4);
+                            }
                         }
                         break;
                     case PFCP_IE_SDF_FILTER:
@@ -523,7 +531,7 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
         default:
             break;
         }
-        off = po + l + PFCP_IE_HDR_LEN;
+        off = po + l;
     }
 }
 

@@ -87,6 +87,7 @@ struct pfcp_packet newPFCPEstablishmentResponse(uint32_t seq, bool s_flag, struc
                 nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS >> 8);
                 nested[noff++] = (uint8_t)(PFCP_IE_UE_IP_ADDRESS & 0xff);
                 nested[noff++] = 0; nested[noff++] = 5;
+                nested[noff++] = 0x02; /* Flags: V4=1 */
                 uint32_t uip = p->pdi_ueip.addr.v4;
                 nested[noff++] = (uint8_t)((uip >> 24) & 0xff);
                 nested[noff++] = (uint8_t)((uip >> 16) & 0xff);

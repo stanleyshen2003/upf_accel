@@ -1511,6 +1511,12 @@ static doca_error_t upf_accel_apply_pending_smf_cfg(struct upf_accel_ctx *upf_ac
  * @fp_data_arr [in]: UPF Acceleration flow processing data
  * @return: DOCA_SUCCESS on success and DOCA_ERROR otherwise
  */
+/* Dummy handler to satisfy check in PFCP thread */
+static void dummy_handler(int sig)
+{
+	(void)sig;
+}
+
 static doca_error_t run_upf_accel(struct upf_accel_ctx *upf_accel_ctx, struct upf_accel_fp_data *fp_data_arr)
 {
 	doca_error_t result;
@@ -1523,6 +1529,11 @@ static doca_error_t run_upf_accel(struct upf_accel_ctx *upf_accel_ctx, struct up
 		DOCA_LOG_ERR("Failed to mask signals");
 		return result;
 	}
+
+	/* Install dummy handler to satisfy check in PFCP thread (it checks for != SIG_DFL) */
+	struct sigaction sa = {0};
+	sa.sa_handler = dummy_handler;
+	sigaction(SIGUSR2, &sa, NULL);
 
 	if (rte_eal_mp_remote_launch(upf_accel_fp_loop_wrapper, fp_data_arr, SKIP_MAIN)) {
 		DOCA_LOG_ERR("Failed to launch FP threads");
