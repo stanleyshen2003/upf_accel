@@ -10,4 +10,12 @@
  */
 struct pfcp_packet newPFCPGenericSimpleResponse(uint8_t req_msg_type, uint8_t seq, bool s_flag);
 
+/* Build a Heartbeat Response packet.
+ * @req_msg_type: the request message type (response will be req_msg_type+1)
+ * @seq: sequence number
+ * @s_flag: whether SEID field should be present (usually false for Heartbeat)
+ * @recovery_timestamp: timestamp value to include
+ */
+struct pfcp_packet newPFCPHeartbeatResponse(uint8_t req_msg_type, uint32_t seq, bool s_flag, uint32_t recovery_timestamp);
+
 #endif /* UPF_ACCEL_PFCP_GENERIC_H_ */

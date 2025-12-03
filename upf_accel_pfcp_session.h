@@ -17,5 +17,9 @@ struct upf_accel_config; /* forward */
 struct pfcp_packet newPFCPEstablishmentResponse(uint32_t seq, bool s_flag, struct upf_accel_config *cfg,
 												const uint8_t *nodeid, uint16_t nodeid_len,
 												uint64_t request_seid);
+
+/* Build a PFCP Session Modification Response */
+struct pfcp_packet newPFCPSessionModificationResponse(uint32_t seq, bool s_flag, uint64_t seid);
+
 #define PFCP_MSG_SESSION_ESTABLISHMENT_RESPONSE  51
 #endif /* UPF_ACCEL_PFCP_SESSION_H_ */

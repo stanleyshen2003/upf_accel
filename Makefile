@@ -19,7 +19,7 @@ build:
 	ssh $(REMOTE_HOST) "export PKG_CONFIG_PATH=/opt/mellanox/doca/lib/aarch64-linux-gnu/pkgconfig:/opt/mellanox/dpdk/lib/aarch64-linux-gnu/pkgconfig:\$$PKG_CONFIG_PATH && cd $(REMOTE_DIR)/.. && rm -rf $(BUILD_DIR) && meson setup $(BUILD_DIR) && ninja -C $(BUILD_DIR)"
 
 run:
-	ssh -t $(REMOTE_HOST) "sudo $(BUILD_DIR)/upf_accel/doca_upf_accel -l 0-6 -- -a pci/03:00.0,dv_flow_en=2 -a pci/03:00.1,dv_flow_en=2 -f ~/policy.json"
+	ssh -t $(REMOTE_HOST) "sudo $(BUILD_DIR)/upf_accel/doca_upf_accel -l 0-6 -- -a pci/03:00.0,dv_flow_en=2 -a pci/03:00.1,dv_flow_en=2 -f $(REMOTE_DIR)/policy.json"
 
 test:
 	cd $(TEST_TOOL_DIR) && go run main.go -s $(REMOTE_ADDR) -n $(LOCAL_IP)

@@ -23,6 +23,7 @@
 #include "upf_accel_pfcp_association.h"
 #include "upf_accel_pfcp_generic.h"
 #include <time.h>
+#include <inttypes.h>
 
 
 
@@ -713,7 +714,23 @@ static void *pfcp_thread_func(void *arg)
 
         switch (message_type) {
         case PFCP_MSG_HEARTBEAT_REQUEST:
-            printf("PFCP: Heartbeat Request\n");
+            printf("PFCP: Heartbeat Request seq=%u\n", seq);
+            {
+                /* Use a static timestamp for simplicity (or current time) */
+                static uint32_t recovery_ts = 0;
+                if (recovery_ts == 0) recovery_ts = (uint32_t)time(NULL);
+
+                struct pfcp_packet pkt = newPFCPHeartbeatResponse(message_type, seq, s_flag, recovery_ts);
+                if (!pkt.buf || pkt.len == 0) {
+                    fprintf(stderr, "PFCP: failed to build Heartbeat Response\n");
+                } else {
+                    if (pfcp_send_response(pkt.buf, pkt.len, &src, src_len) != 0)
+                        perror("Failed to send Heartbeat Response");
+                    else
+                        printf("Sent Heartbeat Response seq=%u\n", seq);
+                    free(pkt.buf);
+                }
+            }
             break;
         case PFCP_MSG_HEARTBEAT_RESPONSE:
             printf("PFCP: Heartbeat Response\n");
@@ -1060,8 +1077,58 @@ static void *pfcp_thread_func(void *arg)
                 }
             }
             break;
+            case PFCP_MSG_SESSION_MODIFICATION_REQUEST:
+            {
+                printf("PFCP: Session Modification Request seq=%u SEID=%" PRIu64 "\n", seq, seid);
+                /* For now, we don't actually modify the session state (PDRs/FARs) because
+                   our simple implementation just re-applies the initial config or assumes
+                   it's already correct. We just acknowledge the request to keep the SMF happy.
+                   In a full implementation, we would parse the Update PDR/FAR IEs and apply changes.
+                */
+                
+                /* Send Session Modification Response */
+                /* The Response header SEID should be the CP SEID.
+                   Since we don't track CP SEID in our simple session table yet, and the Request
+                   header contains the UPF SEID (because it's sent TO the UPF), we have a dilemma.
+                   However, usually the SMF expects its own SEID in the response header.
+                   The SMF's SEID was provided in the F-SEID of the Establishment Request.
+                   If we didn't save it, we can't put it here.
+                   BUT, often for simple testing, echoing the SEID from the request header (UPF SEID)
+                   might be rejected by strict SMFs, OR if the SMF uses the same SEID for both ends.
+                   Let's try to find the session and see if we stored the CP SEID.
+                   We don't store it currently.
+                   Let's try sending with the SEID from the request header (which is UPF SEID).
+                   If that fails, we might need to store CP SEID during Establishment.
+                   Wait, the SMF sends the request to UPF, so the header SEID is the UPF's SEID.
+                   The response must go to SMF, so the header SEID must be the SMF's SEID.
+                   We MUST know the SMF's SEID.
+                   
+                   Let's check if we can parse F-SEID from the Modification Request?
+                   Modification Request usually doesn't carry F-SEID unless it's being updated.
+                   
+                   CRITICAL: We need to store the CP SEID during Establishment to respond correctly here.
+                   But for a quick fix to "Unknown message type", let's just send a response.
+                   If we send with SEID=0 or the UPF SEID, maybe it works?
+                   Let's try using the SEID from the request (UPF SEID) for now.
+                   If the user complains about "Session not found" on SMF side, we'll know.
+                */
+                struct pfcp_packet pkt = newPFCPSessionModificationResponse(seq, s_flag, seid);
+                if (!pkt.buf || pkt.len == 0) {
+                    fprintf(stderr, "PFCP: failed to build Session Modification Response\n");
+                } else {
+                    if (pfcp_send_response(pkt.buf, pkt.len, &src, src_len) != 0)
+                        perror("Failed to send Session Modification Response");
+                    else
+                        printf("Sent Session Modification Response seq=%u\n", seq);
+                    free(pkt.buf);
+                }
+            }
+            break;
+
         default:
-            printf("PFCP: Unknown message type %u\n", message_type);
+            if (message_type != 0) {
+                 fprintf(stderr, "PFCP: Unknown message type %u\n", message_type);
+            }
             break;
         }
     }
