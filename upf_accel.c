@@ -40,7 +40,7 @@
 #include "upf_accel.h"
 #include "upf_accel_flow_processing.h"
 #include "upf_accel_pipeline.h"
-#include "upf_accel_pfcp.h"
+#include "pfcp/pfcp_main.h"
 #include <pthread.h>
 
 DOCA_LOG_REGISTER(UPF_ACCEL);

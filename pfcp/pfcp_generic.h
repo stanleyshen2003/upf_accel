@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "upf_accel_pfcp_packet.h"
+#include "pfcp_packet.h"
 
 /* Build a generic PFCP response that contains only a Cause IE.
  * Returns a `pfcp_packet` containing a malloc'd buffer (caller frees it).

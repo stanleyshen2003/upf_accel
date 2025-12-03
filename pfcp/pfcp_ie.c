@@ -1,25 +1,8 @@
-#include "upf_accel_pfcp_ie.h"
+#include "pfcp_ie.h"
+#include "pfcp_util.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-static inline uint16_t be16(const uint8_t *b)
-{
-    return (uint16_t)((b[0] << 8) | b[1]);
-}
-
-static inline uint32_t be32(const uint8_t *b)
-{
-    return (uint32_t)((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]);
-}
-
-static inline uint64_t be64(const uint8_t *b)
-{
-    uint64_t v = 0;
-    for (int i = 0; i < 8; ++i)
-        v = (v << 8) | b[i];
-    return v;
-}
 
 int upf_parse_ies(const uint8_t *buf, size_t buflen, size_t start_off, struct upf_ie **ies_out, size_t *num_out)
 {
