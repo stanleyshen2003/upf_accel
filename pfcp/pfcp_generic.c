@@ -1,5 +1,5 @@
-#include "upf_accel_pfcp_generic.h"
-#include "upf_accel_pfcp_ie.h"
+#include "pfcp_generic.h"
+#include "pfcp_ie.h"
 
 #include <string.h>
 #include <stdlib.h>

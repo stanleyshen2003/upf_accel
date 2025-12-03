@@ -1,10 +1,70 @@
-#include "upf_accel_pfcp_association.h"
-#include "upf_accel_pfcp_packet.h"
-#include "upf_accel_pfcp_ie.h"
+#include "pfcp_association.h"
+#include "pfcp_packet.h"
+#include "pfcp_ie.h"
+#include "pfcp_util.h"
+#include "pfcp_main.h"
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
+
+void handle_association_message(uint8_t message_type, uint32_t seq, uint8_t msg_priority, bool s_flag, 
+                                const uint8_t *buf, size_t n, size_t hdr_off,
+                                const struct sockaddr_in *src, socklen_t src_len)
+{
+    printf("PFCP: Association message type=%u seq=%u\n", message_type, seq);
+    /* Parse top-level IEs and capture NodeID payload if present. */
+    struct upf_ie *top_ies = NULL; size_t top_n = 0;
+    const uint8_t *node_payload = NULL; uint16_t node_payload_len = 0;
+    if (upf_parse_ies(buf, n, hdr_off, &top_ies, &top_n) == 0 && top_n > 0) {
+        const struct upf_ie *node_ie = upf_find_ie(top_ies, top_n, PFCP_IE_NODE_ID, 0);
+        if (node_ie) {
+            /* Save pointer/len to the value area (points into `buf`) */
+            node_payload = node_ie->value;
+            node_payload_len = (uint16_t)node_ie->len;
+            char nid[64] = {0};
+            if (upf_ie_to_nodeid(node_ie, nid, sizeof(nid)) == 0) {
+                if (!find_rnode_by_id(nid)) {
+                    /* Cast away const for add_rnode as it copies the address */
+                    add_rnode(nid, (struct sockaddr_in *)src);
+                    printf("Registered RemoteNode %s -> %s\n", nid, inet_ntoa(src->sin_addr));
+                }
+            }
+        }
+        upf_free_ies(top_ies);
+        top_ies = NULL;
+    }
+
+    /* Build and send Association Response. Prefer NodeID from request; if
+     * absent, fall back to the local socket IPv4 address. */
+    {
+        struct pfcp_packet pkt = { NULL, 0 };
+        if (node_payload && node_payload_len > 0) {
+            pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, node_payload, node_payload_len);
+        } else {
+            struct sockaddr_in local;
+            if (pfcp_get_local_addr(&local) == 0) {
+                uint8_t nodebuf[5];
+                nodebuf[0] = 0x00; /* type: IPv4 */
+                memcpy(&nodebuf[1], &local.sin_addr.s_addr, 4);
+                pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, nodebuf, 5);
+            } else {
+                pkt = newPFCPAssociationResponse(message_type, seq, msg_priority, s_flag, NULL, 0);
+            }
+        }
+
+        if (!pkt.buf || pkt.len == 0) {
+            fprintf(stderr, "PFCP: failed to build Association Response\n");
+        } else {
+            if (pfcp_send_response(pkt.buf, pkt.len, src, src_len) != 0)
+                perror("Failed to send Association Response");
+            else
+                printf("Sent Association Response type=%u\n", message_type + 1);
+            free(pkt.buf);
+        }
+    }
+}
 
 struct pfcp_packet newPFCPAssociationResponse(uint8_t req_msg_type, uint32_t seq24, uint8_t priority, bool s_flag,
                                               const uint8_t *nodeid_payload, uint16_t nodeid_len)

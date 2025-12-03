@@ -29,11 +29,13 @@ app_srcs = [
 	APP_NAME + '_flow_processing.c',
 	APP_NAME + '_print_header.c',
 	APP_NAME + '_smf_default_init.c',
-	APP_NAME + '_pfcp.c',
-	APP_NAME + '_pfcp_association.c',
-	APP_NAME + '_pfcp_generic.c',
-	APP_NAME + '_pfcp_session.c',
-	APP_NAME + '_pfcp_ie.c',
+	'pfcp/pfcp_main.c',
+	'pfcp/pfcp_util.c',
+	'pfcp/pfcp_heartbeat.c',
+	'pfcp/pfcp_association.c',
+	'pfcp/pfcp_session.c',
+	'pfcp/pfcp_ie.c',
+	'pfcp/pfcp_generic.c',
 	common_dir_path + '/dpdk_utils.c',
 	common_dir_path + '/packet_parser.c',
 	samples_dir_path + '/common.c',
@@ -42,6 +44,7 @@ app_srcs = [
 
 app_inc_dirs += include_directories(samples_dir_path)
 app_inc_dirs += include_directories(samples_dir_path + '/doca_flow')
+app_inc_dirs += include_directories('pfcp')
 
 # JSON parser dependency
 app_dependencies += dependency('json-c')
