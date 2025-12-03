@@ -37,6 +37,9 @@ int upf_parse_ies(const uint8_t *buf, size_t buflen, size_t start_off, struct up
         off = po + l;
     }
 
+    printf("Top-level IEs parsed: %zu\n", count);
+    printf("buflen=%zu start_off=%zu\n", buflen, start_off);
+
     if (count == 0) {
         *ies_out = NULL;
         *num_out = 0;
@@ -322,6 +325,65 @@ int upf_build_nodeid_ipv4(uint32_t ip_be, uint8_t **out_buf, size_t *out_len)
     ipv4[3] = (uint8_t)((ip_be >> 8) & 0xff);
     ipv4[4] = (uint8_t)(ip_be & 0xff);
     return upf_build_ie(PFCP_IE_NODE_ID, ipv4, 5, out_buf, out_len);
+}
+
+/* Build F-SEID IE: 8-byte SEID (big-endian) followed by optional 4-byte IPv4 address. */
+int upf_build_fseid(uint64_t seid, int has_ipv4, uint32_t ipv4_be, uint8_t **out_buf, size_t *out_len)
+{
+    if (!out_buf || !out_len) return -1;
+    /* Layout: 1 byte flags, 8 bytes SEID (big-endian), optional 4 bytes IPv4
+     * Total length = 9 (no IPv4) or 13 (with IPv4) */
+    uint8_t tmp[13]; size_t plen = 9;
+
+    uint8_t flags = 0;
+    if (has_ipv4) flags |= 0x02;
+    tmp[0] = flags;
+
+    /* write SEID into tmp[1..8] (big-endian) */
+    uint64_t v = seid;
+    for (int i = 8; i >= 1; --i) {
+        tmp[i] = (uint8_t)(v & 0xff);
+        v >>= 8;
+    }
+
+    if (has_ipv4) {
+        tmp[9]  = (uint8_t)((ipv4_be >> 24) & 0xff);
+        tmp[10] = (uint8_t)((ipv4_be >> 16) & 0xff);
+        tmp[11] = (uint8_t)((ipv4_be >> 8) & 0xff);
+        tmp[12] = (uint8_t)(ipv4_be & 0xff);
+        plen = 13;
+    }
+    return upf_build_ie(PFCP_IE_FSEID, tmp, (uint16_t)plen, out_buf, out_len);
+}
+
+/* Parse F-SEID IE: extract 8-byte SEID and optional IPv4 address. */
+int upf_ie_to_fseid(const struct upf_ie *ie, uint64_t *seid_out, int *has_ipv4, uint32_t *ipv4_out)
+{
+    if (!ie) return -1;
+    /* Must have at least: 1 byte flags + 8 bytes SEID */
+    if (ie->len < 9) return -1;
+    uint8_t flags = ie->value[0];
+    /* SEID occupies octets 2..9 (1-based) -> indexes 1..8 (0-based) */
+    uint64_t v = 0;
+    for (int i = 1; i <= 8; ++i) v = (v << 8) | ie->value[i];
+    if (seid_out) *seid_out = v;
+
+    /* Flags: bit 7 (0x40) indicates IPv4 present, bit 8 (0x80) indicates IPv6 present */
+    int ipv4_present = (flags & 0x02) ? 1 : 0;
+    if (has_ipv4) *has_ipv4 = ipv4_present;
+
+    if (ipv4_present) {
+        /* IPv4 address follows SEID: requires additional 4 bytes */
+        if (ie->len < 9 + 4) return -1;
+        if (ipv4_out) {
+            uint32_t ip = be32(&ie->value[9]);
+            *ipv4_out = ip;
+        }
+    } else {
+        if (ipv4_out) *ipv4_out = 0;
+    }
+
+    return 0;
 }
 
 /* Parse a Cause IE into struct upf_cause */

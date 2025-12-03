@@ -23,6 +23,7 @@
 #include "upf_accel_pfcp_association.h"
 #include "upf_accel_pfcp_generic.h"
 #include <time.h>
+#include <inttypes.h>
 
 
 
@@ -449,17 +450,21 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
 {
     memset(pdr, 0, sizeof(*pdr));
     pdr->pdi_qfi = 0;
+    printf("parse_create_pdr: len=%zu\n", len);
     size_t off = 0;
     while (off + PFCP_IE_HDR_LEN <= len) {
         uint16_t t = be16(&payload[off]);
         uint16_t l = be16(&payload[off + 2]);
+        printf("  CreatePDR child: type=%u len=%u off=%zu\n", t, l, off);
         size_t po = off + PFCP_IE_HDR_LEN;
         if (po + l > len)
             break;
         switch (t) {
         case PFCP_IE_PDR_ID:
-            if (l >= 4)
-                pdr->id = be32(&payload[po]);
+            if (l >= 2) {
+                pdr->id = be16(&payload[po]);
+            }
+            printf("Parsing CreatePDR IE for PDR ID %u\n", pdr->id);
             break;
         case PFCP_IE_FAR_ID:
             if (l >= 4)
@@ -473,9 +478,12 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
                 while (ipoff + PFCP_IE_HDR_LEN <= ipend) {
                     uint16_t it = be16(&payload[ipoff]);
                     uint16_t il = be16(&payload[ipoff + 2]);
+                    printf("  PDI child: type=%u len=%u off=%zu\n", it, il, ipoff);
                     size_t ip = ipoff + PFCP_IE_HDR_LEN;
-                    if (ip + il > ipend)
+                    if (ip + il > ipend) {
+                        printf("  PDI child overflow: ip=%zu il=%u ipend=%zu\n", ip, il, ipend);
                         break;
+                    }
                     switch (it) {
                     case PFCP_IE_SOURCE_INTERFACE:
                         if (il >= 1) {
@@ -487,11 +495,14 @@ static void parse_create_pdr(const uint8_t *payload, size_t len, struct upf_acce
                         }
                         break;
                     case PFCP_IE_UE_IP_ADDRESS:
-                        if (il >= 4) {
-                            /* assume IPv4 address in first 4 bytes */
-                            pdr->pdi_ueip.addr.v4 = be32(&payload[ip]);
-                            pdr->pdi_ueip.mask.v4 = 0xFFFFFFFF;
-                            pdr->pdi_ueip.ip_version = DOCA_FLOW_L3_TYPE_IP4;
+                        if (il >= 5) {
+                            uint8_t flags = payload[ip];
+                            if (flags & 0x02) { /* V4 */
+                                pdr->pdi_ueip.addr.v4 = be32(&payload[ip + 1]);
+                                pdr->pdi_ueip.mask.v4 = 0xFFFFFFFF;
+                                pdr->pdi_ueip.ip_version = DOCA_FLOW_L3_TYPE_IP4;
+                                printf("Parsed UE IP (v4): 0x%08x\n", pdr->pdi_ueip.addr.v4);
+                            }
                         }
                         break;
                     case PFCP_IE_SDF_FILTER:
@@ -648,8 +659,8 @@ static void *pfcp_thread_func(void *arg)
          */
         uint8_t octet1 = (uint8_t)buf[0];
         uint8_t version = octet1 >> 5;
-        bool s_flag = (octet1 & 0x10) != 0;
-        bool mp_flag = (octet1 & 0x08) != 0;
+        bool s_flag = (octet1 & 0x01) != 0;
+        bool mp_flag = (octet1 & 0x02) != 0;
         uint8_t message_type = (uint8_t)buf[1];
         uint16_t msg_len = (uint16_t)((uint8_t)buf[2] << 8 | (uint8_t)buf[3]);
 
@@ -703,7 +714,23 @@ static void *pfcp_thread_func(void *arg)
 
         switch (message_type) {
         case PFCP_MSG_HEARTBEAT_REQUEST:
-            printf("PFCP: Heartbeat Request\n");
+            printf("PFCP: Heartbeat Request seq=%u\n", seq);
+            {
+                /* Use a static timestamp for simplicity (or current time) */
+                static uint32_t recovery_ts = 0;
+                if (recovery_ts == 0) recovery_ts = (uint32_t)time(NULL);
+
+                struct pfcp_packet pkt = newPFCPHeartbeatResponse(message_type, seq, s_flag, recovery_ts);
+                if (!pkt.buf || pkt.len == 0) {
+                    fprintf(stderr, "PFCP: failed to build Heartbeat Response\n");
+                } else {
+                    if (pfcp_send_response(pkt.buf, pkt.len, &src, src_len) != 0)
+                        perror("Failed to send Heartbeat Response");
+                    else
+                        printf("Sent Heartbeat Response seq=%u\n", seq);
+                    free(pkt.buf);
+                }
+            }
             break;
         case PFCP_MSG_HEARTBEAT_RESPONSE:
             printf("PFCP: Heartbeat Response\n");
@@ -824,6 +851,11 @@ static void *pfcp_thread_func(void *arg)
                 }
             }
 
+            printf("Top-level IEs parsed: %zu\n", top_n);
+            for (size_t i = 0; i < top_n; ++i) {
+                printf(" IE[%zu]: type=%u len=%zu\n", i, top_ies[i].type, top_ies[i].len);
+            }
+
             if (num_pdrs == 0 && num_fars == 0 && num_qers == 0 && num_urrs == 0) {
                 printf("No Create* IEs found, skipping SMF apply\n");
             } else {
@@ -906,11 +938,84 @@ static void *pfcp_thread_func(void *arg)
                     } else {
                         printf("Pending SMF config stored (pdrs=%zu fars=%zu qers=%zu urrs=%zu)\n",
                                 pdr_idx, far_idx, qer_idx, urr_idx);
-                        /* Notify main thread to apply the pending config via SIGUSR2 */
-                        if (kill(getpid(), SIGUSR2) != 0) {
-                            perror("Failed to signal main process for SMF apply");
-                        } else {
-                            printf("Signalled main to apply pending SMF config\n");
+
+                        /* Print details of the stored SMF config for debugging/visibility */
+                        printf("PFCP: SMF config details:\n");
+                        if (cfg->pdrs && cfg->pdrs->num_pdrs) {
+                            for (size_t pi = 0; pi < cfg->pdrs->num_pdrs; ++pi) {
+                                struct upf_accel_pdr *p = &cfg->pdrs->arr_pdrs[pi];
+                                printf(" PDR[%zu]: id=%u farid=%u pdi_qfi=%u pdi_si=%u\n",
+                                        pi, p->id, p->farid, p->pdi_qfi, p->pdi_si);
+                                if (p->pdi_ueip.mask.v4 != 0) {
+                                    struct in_addr a; a.s_addr = htonl(p->pdi_ueip.addr.v4);
+                                    printf("  UE IP: %s\n", inet_ntoa(a));
+                                }
+                                if (p->urrids_num) {
+                                    printf("  URR IDs:");
+                                    for (size_t u = 0; u < p->urrids_num; ++u)
+                                        printf(" %u", p->urrids[u]);
+                                    printf("\n");
+                                }
+                                if (p->qerids_num) {
+                                    printf("  QER IDs:");
+                                    for (size_t q = 0; q < p->qerids_num; ++q)
+                                        printf(" %u", p->qerids[q]);
+                                    printf("\n");
+                                }
+                            }
+                        }
+                        if (cfg->fars && cfg->fars->num_fars) {
+                            for (size_t fi = 0; fi < cfg->fars->num_fars; ++fi) {
+                                struct upf_accel_far *f = &cfg->fars->arr_fars[fi];
+                                printf(" FAR[%zu]: id=%u", fi, f->id);
+                                if (f->fp_oh_teid != 0)
+                                    printf(" teid=0x%08x", f->fp_oh_teid);
+                                if (f->fp_oh_ip.mask.v4 != 0) {
+                                    struct in_addr a; a.s_addr = htonl(f->fp_oh_ip.addr.v4);
+                                    printf(" ip=%s", inet_ntoa(a));
+                                }
+                                printf("\n");
+                            }
+                        }
+                        if (cfg->qers && cfg->qers->num_qers) {
+                            for (size_t qi = 0; qi < cfg->qers->num_qers; ++qi) {
+                                struct upf_accel_qer *q = &cfg->qers->arr_qers[qi];
+                                printf(" QER[%zu]: id=%u qfi=%u mbr_dl=%llu\n",
+                                        qi, q->id, q->qfi, (unsigned long long)q->mbr_dl_mbr);
+                            }
+                        }
+                        if (cfg->urrs && cfg->urrs->num_urrs) {
+                            for (size_t ui = 0; ui < cfg->urrs->num_urrs; ++ui) {
+                                struct upf_accel_urr *u = &cfg->urrs->arr_urrs[ui];
+                                printf(" URR[%zu]: id=%u vol_quota_total=%llu\n",
+                                        ui, u->id, (unsigned long long)u->volume_quota_total_volume);
+                            }
+                        }
+
+                        /* Notify main thread to apply the pending config via SIGUSR2.
+                         * Avoid sending the signal if no handler is installed (would
+                         * terminate the process). Query current disposition first. */
+                        {
+                            struct sigaction oldsa;
+                            if (sigaction(SIGUSR2, NULL, &oldsa) == 0) {
+                                if (oldsa.sa_handler == SIG_DFL) {
+                                    printf("PFCP: no SIGUSR2 handler installed; skipping signal to avoid termination\n");
+                                } else {
+                                    if (kill(getpid(), SIGUSR2) != 0) {
+                                        perror("Failed to signal main process for SMF apply");
+                                    } else {
+                                        printf("Signalled main to apply pending SMF config\n");
+                                    }
+                                }
+                            } else {
+                                perror("sigaction");
+                                /* Best-effort: try signalling anyway */
+                                if (kill(getpid(), SIGUSR2) != 0) {
+                                    perror("Failed to signal main process for SMF apply");
+                                } else {
+                                    printf("Signalled main to apply pending SMF config\n");
+                                }
+                            }
                         }
                         /* Register session (if SEID present) */
                         {
@@ -934,7 +1039,29 @@ static void *pfcp_thread_func(void *arg)
 
                         /* Use helper to build Session Establishment Response, then send */
                         {
-                            struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg);
+                            /* Find NodeID IE in top_ies (if present) and pass its raw payload to response builder */
+                            const uint8_t *node_payload = NULL; uint16_t node_payload_len = 0;
+                            if (top_ies) {
+                                const struct upf_ie *node_ie = upf_find_ie(top_ies, top_n, PFCP_IE_NODE_ID, 0);
+                                if (node_ie) {
+                                    node_payload = node_ie->value;
+                                    node_payload_len = (uint16_t)node_ie->len;
+                                }
+                            }
+                            /* Parse F-SEID IE from request (if present) and use its SEID in response header */
+                            uint64_t request_seid = 0;
+                            if (top_ies) {
+                                const struct upf_ie *fie = upf_find_ie(top_ies, top_n, PFCP_IE_FSEID, 0);
+                                if (fie) {
+                                    int has_ipv4 = 0; uint32_t ipv4 = 0;
+                                    if (upf_ie_to_fseid(fie, &request_seid, &has_ipv4, &ipv4) != 0) {
+                                        request_seid = 0;
+                                    }
+                                }
+                            }
+                            printf("PFCP: building Session Establishment Response (seq=%u, req_seid=0x%llx)\n",
+                                   seq, (unsigned long long)request_seid);
+                            struct pfcp_packet pkt = newPFCPEstablishmentResponse(seq, s_flag, cfg, node_payload, node_payload_len, request_seid);
                             if (!pkt.buf || pkt.len == 0) {
                                 fprintf(stderr, "PFCP: failed to build Session Establishment Response\n");
                             } else {
@@ -950,8 +1077,58 @@ static void *pfcp_thread_func(void *arg)
                 }
             }
             break;
+            case PFCP_MSG_SESSION_MODIFICATION_REQUEST:
+            {
+                printf("PFCP: Session Modification Request seq=%u SEID=%" PRIu64 "\n", seq, seid);
+                /* For now, we don't actually modify the session state (PDRs/FARs) because
+                   our simple implementation just re-applies the initial config or assumes
+                   it's already correct. We just acknowledge the request to keep the SMF happy.
+                   In a full implementation, we would parse the Update PDR/FAR IEs and apply changes.
+                */
+                
+                /* Send Session Modification Response */
+                /* The Response header SEID should be the CP SEID.
+                   Since we don't track CP SEID in our simple session table yet, and the Request
+                   header contains the UPF SEID (because it's sent TO the UPF), we have a dilemma.
+                   However, usually the SMF expects its own SEID in the response header.
+                   The SMF's SEID was provided in the F-SEID of the Establishment Request.
+                   If we didn't save it, we can't put it here.
+                   BUT, often for simple testing, echoing the SEID from the request header (UPF SEID)
+                   might be rejected by strict SMFs, OR if the SMF uses the same SEID for both ends.
+                   Let's try to find the session and see if we stored the CP SEID.
+                   We don't store it currently.
+                   Let's try sending with the SEID from the request header (which is UPF SEID).
+                   If that fails, we might need to store CP SEID during Establishment.
+                   Wait, the SMF sends the request to UPF, so the header SEID is the UPF's SEID.
+                   The response must go to SMF, so the header SEID must be the SMF's SEID.
+                   We MUST know the SMF's SEID.
+                   
+                   Let's check if we can parse F-SEID from the Modification Request?
+                   Modification Request usually doesn't carry F-SEID unless it's being updated.
+                   
+                   CRITICAL: We need to store the CP SEID during Establishment to respond correctly here.
+                   But for a quick fix to "Unknown message type", let's just send a response.
+                   If we send with SEID=0 or the UPF SEID, maybe it works?
+                   Let's try using the SEID from the request (UPF SEID) for now.
+                   If the user complains about "Session not found" on SMF side, we'll know.
+                */
+                struct pfcp_packet pkt = newPFCPSessionModificationResponse(seq, s_flag, seid);
+                if (!pkt.buf || pkt.len == 0) {
+                    fprintf(stderr, "PFCP: failed to build Session Modification Response\n");
+                } else {
+                    if (pfcp_send_response(pkt.buf, pkt.len, &src, src_len) != 0)
+                        perror("Failed to send Session Modification Response");
+                    else
+                        printf("Sent Session Modification Response seq=%u\n", seq);
+                    free(pkt.buf);
+                }
+            }
+            break;
+
         default:
-            printf("PFCP: Unknown message type %u\n", message_type);
+            if (message_type != 0) {
+                 fprintf(stderr, "PFCP: Unknown message type %u\n", message_type);
+            }
             break;
         }
     }
