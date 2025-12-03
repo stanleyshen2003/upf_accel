@@ -130,5 +130,16 @@ int upf_build_ie(uint16_t ie_type, const uint8_t *value, uint16_t vlen, uint8_t 
  * ip_be should be in network byte order (big-endian) as uint32_t. */
 int upf_build_nodeid_ipv4(uint32_t ip_be, uint8_t **out_buf, size_t *out_len);
 
+/* F-SEID builder/parser helpers
+ * upf_build_fseid: build an F-SEID IE with 8-byte SEID and optional IPv4 address.
+ *   - `seid`: 64-bit SEID value (host order, will be written big-endian)
+ *   - `has_ipv4`: 0/1 whether to include IPv4 address
+ *   - `ipv4_be`: IPv4 address in network byte order (big-endian uint32_t)
+ *   - `out_buf`, `out_len`: returned allocated IE buffer (caller frees)
+ * upf_ie_to_fseid: parse an F-SEID IE into components (seid, has_ipv4, ipv4)
+ */
+int upf_build_fseid(uint64_t seid, int has_ipv4, uint32_t ipv4_be, uint8_t **out_buf, size_t *out_len);
+int upf_ie_to_fseid(const struct upf_ie *ie, uint64_t *seid_out, int *has_ipv4, uint32_t *ipv4_out);
+
 #endif /* UPF_ACCEL_PFCP_IE_H_ */
 

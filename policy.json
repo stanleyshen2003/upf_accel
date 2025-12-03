@@ -1,0 +1,142 @@
+{
+	"createPdr": [
+		{
+			"pdrId": 1,
+			"pdi": {
+				"sourceInterface": {
+					"type": "0"
+				},
+				"localFT": {
+					"teid_start": 1073741824,
+					"teid_end": 1073807359,
+					"ip": {
+						"v4": "192.168.200.2"
+					}
+				},
+				"userEquipment": {
+					"ip": {
+						"v4": "10.60.0.0/16"
+					}
+				},
+				"sdf": [
+					{
+						"description": "permit out ip from any to assigned"
+					}
+				]
+			},
+			"farId": 1,
+			"urrIds": [
+				1
+			],
+			"qerIds": [
+				1
+			]
+		},
+		{
+			"pdrId": 2,
+			"pdi": {
+				"sourceInterface": {
+					"type": "2"
+				},
+				"userEquipment": {
+					"ip": {
+						"v4": "10.60.0.0/16"
+					}
+				},
+				"sdf": [
+					{
+						"description": "permit out ip from any to assigned"
+					}
+				]
+			},
+			"farId": 2,
+			"urrIds": [
+				2
+			],
+			"qerIds": [
+				2
+			]
+		},
+		{
+			"pdrId": 3,
+			"pdi": {
+				"sourceInterface": {
+					"type": "0"
+				},
+				"localFT": {
+					"teid_start": 1073741824,
+					"teid_end": 1073807359,
+					"ip": {
+						"v4": "192.168.200.2"
+					}
+				},
+				"qfi": 1,
+				"userEquipment": {
+					"ip": {
+						"v4": "10.60.0.0/16"
+					}
+				},
+				"sdf": [
+					{
+						"description": "permit out ip from any to assigned"
+					}
+				]
+			},
+			"farId": 1,
+			"urrIds": [
+				1
+			],
+			"qerIds": [
+				1
+			]
+		}
+	],
+	"createFar": [
+		{
+			"farId": 1
+		},
+		{
+			"farId": 2,
+			"fp": {
+				"outerHeader": {
+					"ip": {
+						"v4": "192.168.201.2"
+					},
+					"teid": 1
+				}
+			}
+		}
+	],
+	"createUrr": [
+		{
+			"urrId": 1,
+			"volumeQuota": {
+				"totalVolume": 4000000000
+			}
+		},
+		{
+			"urrId": 2,
+			"volumeQuota": {
+				"totalVolume": 200000
+			}
+		}
+	],
+	"createQer": [
+		{
+			"qerId": 1,
+			"maxBitRate": {
+				"ulMBR": "2000000000",
+				"dlMBR": "2000000000"
+			},
+			"qfi": "20"
+		},
+		{
+			"qerId": 2,
+			"maxBitRate": {
+				"ulMBR": "2000000000",
+				"dlMBR": "2000000000"
+			},
+			"qfi": "20"
+		}
+	]
+}
