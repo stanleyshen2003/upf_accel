@@ -14,7 +14,7 @@
             - teid_start: Tunnel Endpoint ID start
             - teid_end
             - ip
-                - v4: UPF's N3 IP (pdi_local_teid_ip in the code)
+                - v4: gNB N3 IP
         - qfi: QFI ID
         - userEquipment
             - ip
