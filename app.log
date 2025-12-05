@@ -1,0 +1,118 @@
+[2025-12-04 16:38:05:960690][414998560][DOCA][INF][upf_accel.c:2014][main] Starting UPF Acceleration app pid 110373
+[2025-12-04 16:38:05:960545][414998560][DOCA][INF][doca_log.cpp:633] DOCA version 3.2.0118
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+TELEMETRY: No legacy callbacks, legacy socket not created
+EAL: Probe PCI driver: mlx5_pci (15b3:a2d6) device: 0000:03:00.0 (socket -1)
+EAL: Probe PCI driver: mlx5_pci (15b3:a2d6) device: 0000:03:00.1 (socket -1)
+[2025-12-04 16:38:06:250905][414998560][DOCA][INF][upf_accel_json_parser.c:797][upf_accel_pdr_parse] Parsed PDR id=1
+	farId=1 first_urrid=1 first_qerid=1
+	PDI SI=0 QFI=0 teid_start=0 teid_end=65535 IP=version 4, c0a8c801/255 UEIP=version 4, a3c0000/0
+		SDF proto=0 from=IP version 4, 0/0:0-65535 to= IP version 4, 0/0:0-65535
+[2025-12-04 16:38:06:250962][414998560][DOCA][INF][upf_accel_json_parser.c:797][upf_accel_pdr_parse] Parsed PDR id=2
+	farId=2 first_urrid=2 first_qerid=2
+	PDI SI=2 QFI=0 teid_start=0 teid_end=65535 IP=version 4, c0a8c801/255 UEIP=version 4, a3c0000/0
+		SDF proto=0 from=IP version 4, 0/0:0-65535 to= IP version 4, 0/0:0-65535
+[2025-12-04 16:38:06:250980][414998560][DOCA][INF][upf_accel_json_parser.c:920][upf_accel_far_parse] Parsed FAR id=1:
+	Outer Header ip=1c9a8c0/255
+[2025-12-04 16:38:06:250991][414998560][DOCA][INF][upf_accel_json_parser.c:920][upf_accel_far_parse] Parsed FAR id=2:
+	Outer Header ip=1c8a8c0/255
+[2025-12-04 16:38:06:251001][414998560][DOCA][INF][upf_accel_json_parser.c:1000][upf_accel_urr_parse] Parsed URR id=1 volume_quota_total_volume=500000
+
+[2025-12-04 16:38:06:251009][414998560][DOCA][INF][upf_accel_json_parser.c:1000][upf_accel_urr_parse] Parsed URR id=2 volume_quota_total_volume=500000
+
+[2025-12-04 16:38:06:251016][414998560][DOCA][INF][upf_accel_json_parser.c:1000][upf_accel_urr_parse] Parsed URR id=7 volume_quota_total_volume=500000
+
+[2025-12-04 16:38:06:251023][414998560][DOCA][INF][upf_accel_json_parser.c:1000][upf_accel_urr_parse] Parsed URR id=8 volume_quota_total_volume=500000
+
+[2025-12-04 16:38:06:251035][414998560][DOCA][INF][upf_accel_json_parser.c:1084][upf_accel_qer_parse] Parsed QER id=1
+	qfi=1
+	MBR dl=1000000 ul=1000000
+
+[2025-12-04 16:38:06:251046][414998560][DOCA][INF][upf_accel_json_parser.c:1084][upf_accel_qer_parse] Parsed QER id=2
+	qfi=1
+	MBR dl=208000 ul=208000
+
+[2025-12-04 16:38:06:251055][414998560][DOCA][INF][upf_accel_json_parser.c:1084][upf_accel_qer_parse] Parsed QER id=3
+	qfi=2
+	MBR dl=208000 ul=208000
+
+[2025-12-04 16:38:06:251162][414998560][DOCA][WRN][engine_model.c:90] adapting queue depth to 128.
+[2025-12-04 16:38:07:860135][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:863393][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:866623][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:871504][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:875809][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:880241][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:884586][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:888250][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:07:892669][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:07:892711][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:09:725238][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:11:511753][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:302450][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:305868][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:309338][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:312314][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=1, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:312349][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=1, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:315498][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:318422][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:321642][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:331830][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:331870][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:341854][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:341891][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:348297][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:348330][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:441464][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:447062][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:450354][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:453609][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:458326][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:462971][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:467268][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:471689][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:475124][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:13:479643][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:13:479688][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:15:276040][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:17:077861][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:895815][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:899901][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:903792][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:18:907122][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=1, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:907177][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=1, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:911024][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:18:914564][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:18:917822][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:18:929249][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:929308][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:939782][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:939838][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:946664][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:18:946720][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x0, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:043802][414998560][DOCA][INF][upf_accel_pipeline.c:64][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: NULL (Match-all)
+[2025-12-04 16:38:19:043874][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x1, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:043921][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x1, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:043949][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x1, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:043969][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x1, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:044005][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x2, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:044018][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x2, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:044026][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x2, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:044033][414998560][DOCA][INF][upf_accel_pipeline.c:57][upf_accel_pipe_static_entry_add]   [STATIC ENTRY ADD] Match: Meta=0x2, OuterL3=0, OuterDstIP=0x0, Teid=0, UDPDst=0
+[2025-12-04 16:38:19:044039][414998560][DOCA][INF][upf_accel.c:1396][upf_accel_dump_flows] ================================================================================================
+[2025-12-04 16:38:19:044044][414998560][DOCA][INF][upf_accel.c:1397][upf_accel_dump_flows]   INSTALLED FLOWS DUMP (Independent Shadow Table)
+[2025-12-04 16:38:19:044047][414998560][DOCA][INF][upf_accel.c:1398][upf_accel_dump_flows] ================================================================================================
+[2025-12-04 16:38:19:044054][414998560][DOCA][INF][upf_accel.c:1407][upf_accel_dump_flows] Flow PDR-0 Port-0: tunnel_dst=1.200.168.192, teid=0..65535,  actions=decap(), stats={pkts=0, bytes=0}
+[2025-12-04 16:38:19:044061][414998560][DOCA][INF][upf_accel.c:1407][upf_accel_dump_flows] Flow PDR-0 Port-1: tunnel_dst=1.200.168.192, teid=0..65535,  actions=decap(), stats={pkts=0, bytes=0}
+[2025-12-04 16:38:19:044064][414998560][DOCA][INF][upf_accel.c:1407][upf_accel_dump_flows] Flow PDR-1 Port-0: nw_dst=0.0.60.10,  actions=encap(gtpu, dst=192.168.200.1, teid=2), stats={pkts=0, bytes=0}
+[2025-12-04 16:38:19:044068][414998560][DOCA][INF][upf_accel.c:1407][upf_accel_dump_flows] Flow PDR-1 Port-1: nw_dst=0.0.60.10,  actions=encap(gtpu, dst=192.168.200.1, teid=2), stats={pkts=0, bytes=0}
+[2025-12-04 16:38:19:044075][414998560][DOCA][INF][upf_accel.c:1422][upf_accel_dump_flows] ================================================================================================
+PFCP: created socket fd=200
+PFCP: bound to port 8805
+PFCP: thread started (tid=279139634560928)
+PFCP listener started on port 8805
+[2025-12-04 16:38:19:045524][414998560][DOCA][INF][upf_accel.c:1651][run_upf_accel] Waiting for traffic, press Ctrl+C for termination

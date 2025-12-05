@@ -46,11 +46,11 @@ build:
 
 # Run UPF interactively
 run:
-	ssh -t $(REMOTE_HOST) "$(APP_CMD) -f $(REMOTE_DIR)/policy.json"
+	ssh -t $(REMOTE_HOST) "$(APP_CMD) -f $(REMOTE_DIR)/doca.json -l 60"
 
 # Run UPF in background
 run-upf:
-	ssh $(REMOTE_HOST) "$(APP_CMD) -f ~/policy.json" > app.log 2>&1 & \
+	ssh $(REMOTE_HOST) "$(APP_CMD) -f $(REMOTE_DIR)/doca.json" > app.log 2>&1 & \
 	echo "UPF started in background. Logs in app.log"
 
 stop-upf:

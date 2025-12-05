@@ -10,14 +10,15 @@
 					"teid_start": 1073741824,
 					"teid_end": 1073807359,
 					"ip": {
-						"v4": "192.168.200.2"
+						"v4": "192.168.1.1"
 					}
 				},
 				"userEquipment": {
 					"ip": {
-						"v4": "10.60.0.0/16"
+						"v4": "8.8.0.0/16"
 					}
 				},
+				"qfi": 1,
 				"sdf": [
 					{
 						"description": "permit out ip from any to assigned"
@@ -40,14 +41,15 @@
 				},
 				"userEquipment": {
 					"ip": {
-						"v4": "10.60.0.0/16"
+						"v4": "172.0.0.0/16"
 					}
 				},
 				"sdf": [
 					{
 						"description": "permit out ip from any to assigned"
 					}
-				]
+				],
+				"qfi": 1
 			},
 			"farId": 2,
 			"urrIds": [
@@ -67,13 +69,13 @@
 					"teid_start": 1073741824,
 					"teid_end": 1073807359,
 					"ip": {
-						"v4": "192.168.200.2"
+						"v4": "192.168.1.1"
 					}
 				},
 				"qfi": 1,
 				"userEquipment": {
 					"ip": {
-						"v4": "10.60.0.0/16"
+						"v4": "172.0.0.0/16"
 					}
 				},
 				"sdf": [
@@ -100,7 +102,7 @@
 			"fp": {
 				"outerHeader": {
 					"ip": {
-						"v4": "192.168.201.2"
+						"v4": "192.168.1.1"
 					},
 					"teid": 1
 				}
