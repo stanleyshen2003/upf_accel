@@ -466,6 +466,8 @@ static doca_error_t upf_accel_5t_match(struct conn_parser_ctx *parse_ctx,
 		*src_port = rte_be_to_cpu_16(parse_ctx->transport_ctx.udp_hdr->src_port);
 		*dst_port = rte_be_to_cpu_16(parse_ctx->transport_ctx.udp_hdr->dst_port);
 		break;
+  case 1:
+    break;
 	default:
 		DOCA_LOG_WARN("Unsupported L4 %d", parse_ctx->transport_ctx.proto);
 		return DOCA_ERROR_NOT_SUPPORTED;
@@ -663,8 +665,8 @@ static const struct upf_accel_pdr *upf_accel_ran_pdr_lookup(const struct upf_acc
 
 		if (!upf_accel_pdr_tunnel_is_matching(pdr, &match->outer))
 			continue;
-		if (!upf_accel_pdr_tuple_is_matching(pdr, &match->inner))
-			continue;
+		// if (!upf_accel_pdr_tuple_is_matching(pdr, &match->inner))
+		// 	continue;
 
 		return pdr;
 	}
@@ -714,7 +716,7 @@ static const struct upf_accel_pdr *upf_accel_wan_pdr_lookup(const struct upf_acc
 {
 	const struct upf_accel_pdr *pdr;
 	size_t i;
-
+  return &pdrs->arr_pdrs[1];
 	for (i = 0; i < pdrs->num_pdrs; i++) {
 		pdr = &pdrs->arr_pdrs[i];
 		if (pdr->pdi_si != UPF_ACCEL_PDR_PDI_SI_DL)
@@ -776,24 +778,24 @@ static doca_error_t upf_accel_pipe_8t_ipv4_accel(struct upf_accel_ctx *ctx,
 		pipe = ctx->pipes[port_id][UPF_ACCEL_PIPE_7T_IPV4];
 	}
 
-	hw_match.outer.ip4.src_ip = rte_cpu_to_be_32(match->outer.te_ip.v4);
-	hw_match.tun.gtp_teid = rte_cpu_to_be_32(match->outer.te_id);
-	hw_match.inner.ip4.src_ip = rte_cpu_to_be_32(match->inner.ue_ip.v4);
-	hw_match.inner.ip4.dst_ip = rte_cpu_to_be_32(match->inner.extern_ip.v4);
-	hw_match.inner.ip4.next_proto = match->inner.ip_proto;
-	switch (match->inner.ip_proto) {
-	case DOCA_FLOW_PROTO_TCP:
-		hw_match.inner.tcp.l4_port.dst_port = rte_cpu_to_be_16(match->inner.extern_port);
-		hw_match.inner.tcp.l4_port.src_port = rte_cpu_to_be_16(match->inner.ue_port);
-		break;
-	case DOCA_FLOW_PROTO_UDP:
-		hw_match.inner.udp.l4_port.dst_port = rte_cpu_to_be_16(match->inner.extern_port);
-		hw_match.inner.udp.l4_port.src_port = rte_cpu_to_be_16(match->inner.ue_port);
-		break;
-	default:
-		DOCA_LOG_ERR("Invalid inner IP protocol: %d", match->inner.ip_proto);
-		assert(0);
-	}
+	// hw_match.outer.ip4.src_ip = rte_cpu_to_be_32(match->outer.te_ip.v4);
+	// hw_match.tun.gtp_teid = rte_cpu_to_be_32(match->outer.te_id);
+	// hw_match.inner.ip4.src_ip = rte_cpu_to_be_32(match->inner.ue_ip.v4);
+	// hw_match.inner.ip4.dst_ip = rte_cpu_to_be_32(match->inner.extern_ip.v4);
+	// hw_match.inner.ip4.next_proto = match->inner.ip_proto;
+	// switch (match->inner.ip_proto) {
+	// case DOCA_FLOW_PROTO_TCP:
+	// 	hw_match.inner.tcp.l4_port.dst_port = rte_cpu_to_be_16(match->inner.extern_port);
+	// 	hw_match.inner.tcp.l4_port.src_port = rte_cpu_to_be_16(match->inner.ue_port);
+	// 	break;
+	// case DOCA_FLOW_PROTO_UDP:
+	// 	hw_match.inner.udp.l4_port.dst_port = rte_cpu_to_be_16(match->inner.extern_port);
+	// 	hw_match.inner.udp.l4_port.src_port = rte_cpu_to_be_16(match->inner.ue_port);
+	// 	break;
+	// default:
+	// 	DOCA_LOG_ERR("Invalid inner IP protocol: %d", match->inner.ip_proto);
+	// 	assert(0);
+	// }
 	actions.meta.pkt_meta = DOCA_HTOBE32(pdr_id);
 
 	res = doca_flow_pipe_add_entry(queue_id,
@@ -974,6 +976,8 @@ static doca_error_t upf_accel_pipe_5t_ipv4_accel(struct upf_accel_ctx *ctx,
 		hw_match.outer.udp.l4_port.dst_port = rte_cpu_to_be_16(match->ue_port);
 		hw_match.outer.udp.l4_port.src_port = rte_cpu_to_be_16(match->extern_port);
 		break;
+  case 1:
+    break;
 	default:
 		DOCA_LOG_ERR("Invalid outer IP protocol: %d", match->ip_proto);
 		assert(0);

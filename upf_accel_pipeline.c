@@ -396,10 +396,12 @@ static doca_error_t upf_accel_pipe_encap_counter_create(struct upf_accel_ctx *up
 	const uint16_t src_ipv6[] = UPF_ACCEL_SRC_IPV6;
 	const uint8_t src_mac[] = UPF_ACCEL_SRC_MAC;
 	const uint8_t dst_mac[] = UPF_ACCEL_DST_MAC;
+	const uint8_t n3_mac[] = UPF_ACCEL_N3_MAC;
 	struct doca_flow_actions act_encap_ip4_5g;
 	struct doca_flow_actions act_encap_ip6_4g;
 	struct doca_flow_actions act_encap_ip6_5g;
 	struct doca_flow_actions act_none = {0};
+	struct doca_flow_actions act_mod_mac = {0};
 	struct doca_flow_match match = {0};
 	char *pipe_name = "ENCAP_PIPE";
 	doca_error_t result;
@@ -424,12 +426,12 @@ static doca_error_t upf_accel_pipe_encap_counter_create(struct upf_accel_ctx *up
 		     src_mac[4],
 		     src_mac[5]);
 	SET_MAC_ADDR(act_encap_ip4_4g.encap_cfg.encap.outer.eth.dst_mac,
-		     dst_mac[0],
-		     dst_mac[1],
-		     dst_mac[2],
-		     dst_mac[3],
-		     dst_mac[4],
-		     dst_mac[5]);
+		     n3_mac[0],
+		     n3_mac[1],
+		     n3_mac[2],
+		     n3_mac[3],
+		     n3_mac[4],
+		     n3_mac[5]);
 
 	memcpy(&act_encap_ip6_4g, &act_encap_ip4_4g, sizeof(act_encap_ip4_4g));
 	act_encap_ip6_4g.encap_cfg.encap.outer.eth.type = rte_cpu_to_be_16(DOCA_FLOW_ETHER_TYPE_IPV6);
@@ -443,13 +445,36 @@ static doca_error_t upf_accel_pipe_encap_counter_create(struct upf_accel_ctx *up
 
 	memcpy(&act_encap_ip6_5g, &act_encap_ip6_4g, sizeof(act_encap_ip6_4g));
 	act_encap_ip6_5g.encap_cfg.encap.tun.gtp_next_ext_hdr_type = UPF_ACCEL_PSC_EXTENSION_CODE;
+	act_encap_ip6_5g.encap_cfg.encap.tun.gtp_next_ext_hdr_type = UPF_ACCEL_PSC_EXTENSION_CODE;
 	act_encap_ip6_5g.encap_cfg.encap.tun.gtp_ext_psc_qfi = UINT8_MAX;
+
+	SET_MAC_ADDR(act_mod_mac.outer.eth.src_mac,
+		     src_mac[0],
+		     src_mac[1],
+		     src_mac[2],
+		     src_mac[3],
+		     src_mac[4],
+		     src_mac[5]);
+	SET_MAC_ADDR(act_mod_mac.outer.eth.dst_mac,
+		     dst_mac[0],
+		     dst_mac[1],
+		     dst_mac[2],
+		     dst_mac[3],
+		     dst_mac[4],
+		     dst_mac[5]);
 
 	action_list[UPF_ACCEL_ENCAP_ACTION_IPV4_4G] = &act_encap_ip4_4g;
 	action_list[UPF_ACCEL_ENCAP_ACTION_IPV4_5G] = &act_encap_ip4_5g;
 	action_list[UPF_ACCEL_ENCAP_ACTION_IPV6_4G] = &act_encap_ip6_4g;
 	action_list[UPF_ACCEL_ENCAP_ACTION_IPV6_5G] = &act_encap_ip6_5g;
 	action_list[UPF_ACCEL_ENCAP_ACTION_NONE] = &act_none;
+
+	if (pipe_cfg->port_id == 1) {
+		action_list[UPF_ACCEL_ENCAP_ACTION_IPV4_4G] = &act_mod_mac;
+		action_list[UPF_ACCEL_ENCAP_ACTION_IPV4_5G] = &act_mod_mac;
+		action_list[UPF_ACCEL_ENCAP_ACTION_IPV6_4G] = &act_mod_mac;
+		action_list[UPF_ACCEL_ENCAP_ACTION_IPV6_5G] = &act_mod_mac;
+	}
 
 	result = upf_accel_pipe_create(pipe_cfg, pipe);
 	if (result != DOCA_SUCCESS) {
@@ -1610,6 +1635,7 @@ static doca_error_t upf_accel_pipe_uldl_create(struct upf_accel_ctx *upf_accel_c
 		.next_pipe = upf_accel_ctx->pipes[pipe_cfg->port_id][UPF_ACCEL_PIPE_5T_OUTER_IP_TYPE]};
 	struct doca_flow_fwd fwd = {.type = DOCA_FLOW_FWD_PIPE};
 	uint32_t fixed_port = upf_accel_ctx->upf_accel_cfg->fixed_port;
+  DOCA_LOG_INFO("Fixed port: %d", fixed_port);
 	struct doca_flow_fwd *fwd_miss_ptr;
 	struct doca_flow_match match = {0};
 	char *pipe_name = "ULDL_PIPE";

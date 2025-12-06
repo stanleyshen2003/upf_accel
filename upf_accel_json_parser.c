@@ -794,7 +794,7 @@ static doca_error_t upf_accel_pdr_parse(struct json_object *pdr_arr, struct upf_
 		if (err != DOCA_SUCCESS)
 			goto err_pdr;
 
-		DOCA_LOG_INFO(
+		DOCA_LOG_DBG(
 			"Parsed PDR id=%u\n\tfarId=%u first_urrid=%u first_qerid=%u\n\tPDI SI=%u QFI=%hhu teid_start=%u teid_end=%u IP=version %d, %x/%hhu UEIP=version %d, %x/%hhu\n\t\tSDF proto=%d from=IP version %d, %x/%hhu:%hu-%hu to= IP version %d, %x/%hhu:%hu-%hu",
 			upf_accel_pdr->id,
 			upf_accel_pdr->farid,
@@ -917,7 +917,7 @@ static doca_error_t upf_accel_far_parse(struct json_object *far_arr, struct upf_
 				goto err_far;
 		}
 
-		DOCA_LOG_INFO("Parsed FAR id=%u:\n"
+		DOCA_LOG_DBG("Parsed FAR id=%u:\n"
 			      "\tOuter Header ip=%x/%hhu",
 			      upf_accel_far->id,
 			      rte_be_to_cpu_32(upf_accel_far->fp_oh_ip.addr.v4),
@@ -997,7 +997,7 @@ static doca_error_t upf_accel_urr_parse(struct json_object *urr_arr, struct upf_
 		if (err != DOCA_SUCCESS)
 			goto err_far;
 
-		DOCA_LOG_INFO("Parsed URR id=%u volume_quota_total_volume=%lu\n",
+		DOCA_LOG_DBG("Parsed URR id=%u volume_quota_total_volume=%lu\n",
 			      upf_accel_urr->id,
 			      upf_accel_urr->volume_quota_total_volume);
 	}
@@ -1081,7 +1081,7 @@ static doca_error_t upf_accel_qer_parse(struct json_object *qer_arr, struct upf_
 		if (err != DOCA_SUCCESS)
 			goto err_far;
 
-		DOCA_LOG_INFO("Parsed QER id=%u\n"
+		DOCA_LOG_DBG("Parsed QER id=%u\n"
 			      "\tqfi=%hhu\n"
 			      "\tMBR dl=%lu ul=%lu\n",
 			      upf_accel_qer->id,
