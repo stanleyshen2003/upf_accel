@@ -716,7 +716,7 @@ static const struct upf_accel_pdr *upf_accel_wan_pdr_lookup(const struct upf_acc
 {
 	const struct upf_accel_pdr *pdr;
 	size_t i;
-
+  return &pdrs->arr_pdrs[1];
 	for (i = 0; i < pdrs->num_pdrs; i++) {
 		pdr = &pdrs->arr_pdrs[i];
 		if (pdr->pdi_si != UPF_ACCEL_PDR_PDI_SI_DL)
@@ -976,6 +976,8 @@ static doca_error_t upf_accel_pipe_5t_ipv4_accel(struct upf_accel_ctx *ctx,
 		hw_match.outer.udp.l4_port.dst_port = rte_cpu_to_be_16(match->ue_port);
 		hw_match.outer.udp.l4_port.src_port = rte_cpu_to_be_16(match->extern_port);
 		break;
+  case 1:
+    break;
 	default:
 		DOCA_LOG_ERR("Invalid outer IP protocol: %d", match->ip_proto);
 		assert(0);

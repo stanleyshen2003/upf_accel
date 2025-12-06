@@ -46,7 +46,7 @@ build:
 
 # Run UPF interactively
 run:
-	ssh -t $(REMOTE_HOST) "$(APP_CMD) -f $(REMOTE_DIR)/doca.json -l 60 -p 0"
+	ssh -t $(REMOTE_HOST) "$(APP_CMD) -f $(REMOTE_DIR)/doca.json -l 60"
 
 # Run UPF in background
 run-upf:
