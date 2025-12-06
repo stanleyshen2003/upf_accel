@@ -68,7 +68,7 @@ enum upf_accel_port {
 		0xde, 0xad, 0xbe, 0xef, 0x00, 0x02 \
 	}
 
-#define UPF_ACCEL_SRC_IP 0xc0a80101 // 192.168.1.1
+#define UPF_ACCEL_SRC_IP 0xc0a8c901 // 192.168.1.1
 #define UPF_ACCEL_DST_IP 0xc0a80201 // 192.168.2.1
 #define UPF_ACCEL_SRC_IPV6 \
 	{ \

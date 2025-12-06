@@ -1610,6 +1610,7 @@ static doca_error_t upf_accel_pipe_uldl_create(struct upf_accel_ctx *upf_accel_c
 		.next_pipe = upf_accel_ctx->pipes[pipe_cfg->port_id][UPF_ACCEL_PIPE_5T_OUTER_IP_TYPE]};
 	struct doca_flow_fwd fwd = {.type = DOCA_FLOW_FWD_PIPE};
 	uint32_t fixed_port = upf_accel_ctx->upf_accel_cfg->fixed_port;
+  DOCA_LOG_INFO("Fixed port: %d", fixed_port);
 	struct doca_flow_fwd *fwd_miss_ptr;
 	struct doca_flow_match match = {0};
 	char *pipe_name = "ULDL_PIPE";

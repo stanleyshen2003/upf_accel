@@ -37,7 +37,7 @@ app_srcs = [
 	'pfcp/pfcp_ie.c',
 	'pfcp/pfcp_generic.c',
 	common_dir_path + '/dpdk_utils.c',
-	common_dir_path + '/packet_parser.c',
+	'packet_parser.c',
 	samples_dir_path + '/common.c',
 	samples_dir_path + '/doca_flow/flow_common.c',
 ]
@@ -48,6 +48,9 @@ app_inc_dirs += include_directories('pfcp')
 
 # JSON parser dependency
 app_dependencies += dependency('json-c')
+
+cc = meson.get_compiler('c')
+app_dependencies += cc.find_library('doca_flow_tune_server', dirs: ['/opt/mellanox/doca/lib/aarch64-linux-gnu'])
 
 executable(DOCA_PREFIX + APP_NAME,
 	app_srcs,
