@@ -46,7 +46,7 @@ build:
 
 # Run UPF interactively
 run:
-	ssh -t $(REMOTE_HOST) "$(APP_CMD) -f $(REMOTE_DIR)/doca.json -l 60"
+	ssh -t $(REMOTE_HOST) "$(APP_CMD) -f $(REMOTE_DIR)/doca.json"
 
 # Run UPF in background
 run-upf:
@@ -61,7 +61,7 @@ stop-upf:
 # -----------------------------------------------------------------------------
 
 run-free5gc-core:
-	cd $(FREE5GC_DIR) && ./run.sh &
+	cd $(FREE5GC_DIR) && ./run.sh
 
 stop-free5gc-core:
 	$(FREE5GC_DIR)/force_kill.sh
