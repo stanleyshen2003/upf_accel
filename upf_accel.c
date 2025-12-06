@@ -255,26 +255,34 @@ upf_accel_shared_meters_level_init(struct upf_accel_ctx *upf_accel_ctx,
  * @upf_accel_ctx [in]: UPF Acceleration context.
  * @return: DOCA_SUCCESS on success and DOCA_ERROR otherwise
  */
-static doca_error_t
-upf_accel_shared_meters_init(struct upf_accel_ctx *upf_accel_ctx) {
-  struct upf_accel_pdrs *pdrs = upf_accel_ctx->upf_accel_cfg->pdrs;
-  const struct upf_accel_pdr *pdr;
-  doca_error_t result;
-  uint32_t pdr_idx;
+/*
+static doca_error_t upf_accel_shared_meters_init(struct upf_accel_ctx
+*upf_accel_ctx)
+{
+        struct doca_flow_resource_meter_cfg meter_cfg = {0};
+        uint32_t nb_meters_per_port = UPF_ACCEL_NUM_METERS_PER_PORT;
+        enum upf_accel_port port_id;
+        doca_error_t result;
+        uint32_t i;
 
-  for (pdr_idx = 0; pdr_idx < pdrs->num_pdrs; ++pdr_idx) {
-    pdr = &pdrs->arr_pdrs[pdr_idx];
+        meter_cfg.limit = 1;
+        meter_cfg.cir = 1;
+        meter_cfg.cbs = 1;
 
-    result = upf_accel_shared_meters_level_init(upf_accel_ctx, pdr);
-    if (result != DOCA_SUCCESS) {
-      DOCA_LOG_ERR("Failed to init DOCA shared meters of pdr %u: %s", pdr_idx,
-                   doca_error_get_descr(result));
-      return result;
-    }
-  }
+        for (port_id = 0; port_id < upf_accel_ctx->num_ports; port_id++) {
+                for (i = 0; i < nb_meters_per_port; i++) {
+                        result = doca_flow_resource_meter_create(&meter_cfg,
+                                                                 &upf_accel_ctx->shared_meter_id_to_res[port_id][i]);
+                        if (result != DOCA_SUCCESS) {
+                                DOCA_LOG_ERR("Failed to create shared meter:
+%s", doca_error_get_descr(result)); return result;
+                        }
+                }
+        }
 
-  return DOCA_SUCCESS;
+        return DOCA_SUCCESS;
 }
+*/
 
 /*
  * Insert a static PDR entry
@@ -582,6 +590,89 @@ pipe_shared_meter_insert(struct upf_accel_ctx *upf_accel_ctx, uint32_t pdr_idx,
 }
 
 /*
+ * Create a flow pipe
+ *
+ * @pipe_cfg [in]: UPF Acceleration pipe configuration
+ * @pipe [out]: pointer to store the created pipe at
+ * @return: DOCA_SUCCESS on success and DOCA_ERROR otherwise
+ */
+static doca_error_t upf_accel_pipe_create(struct upf_accel_pipe_cfg *pipe_cfg,
+                                          struct doca_flow_pipe **pipe) {
+  struct doca_flow_pipe_cfg *cfg;
+  doca_error_t result;
+
+  result = doca_flow_pipe_cfg_create(&cfg, pipe_cfg->port);
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to create doca_flow_pipe_cfg: %s",
+                 doca_error_get_descr(result));
+    return result;
+  }
+
+  result = set_flow_pipe_cfg(cfg, pipe_cfg->name, DOCA_FLOW_PIPE_BASIC,
+                             pipe_cfg->is_root);
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to set doca_flow_pipe_cfg: %s",
+                 doca_error_get_descr(result));
+    goto destroy_pipe_cfg;
+  }
+
+  result = doca_flow_pipe_cfg_set_domain(cfg, pipe_cfg->domain);
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to set doca_flow_pipe_cfg domain: %s",
+                 doca_error_get_descr(result));
+    goto destroy_pipe_cfg;
+  }
+
+  result = doca_flow_pipe_cfg_set_nr_entries(cfg, pipe_cfg->num_entries);
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to set doca_flow_pipe_cfg num_entries: %s",
+                 doca_error_get_descr(result));
+    goto destroy_pipe_cfg;
+  }
+
+  if (pipe_cfg->match != NULL) {
+    result = doca_flow_pipe_cfg_set_match(cfg, pipe_cfg->match,
+                                          pipe_cfg->match_mask);
+    if (result != DOCA_SUCCESS) {
+      DOCA_LOG_ERR("Failed to set doca_flow_pipe_cfg match: %s",
+                   doca_error_get_descr(result));
+      goto destroy_pipe_cfg;
+    }
+  }
+
+  if (pipe_cfg->mon != NULL) {
+    result = doca_flow_pipe_cfg_set_monitor(cfg, pipe_cfg->mon);
+    if (result != DOCA_SUCCESS) {
+      DOCA_LOG_ERR("Failed to set doca_flow_pipe_cfg monitor: %s",
+                   doca_error_get_descr(result));
+      goto destroy_pipe_cfg;
+    }
+  }
+
+  if (pipe_cfg->actions.num_actions) {
+    result = doca_flow_pipe_cfg_set_actions(
+        cfg, pipe_cfg->actions.action_list, NULL,
+        pipe_cfg->actions.action_desc_list, pipe_cfg->actions.num_actions);
+    if (result != DOCA_SUCCESS) {
+      DOCA_LOG_ERR("Failed to set doca_flow_pipe_cfg actions: %s",
+                   doca_error_get_descr(result));
+      goto destroy_pipe_cfg;
+    }
+  }
+
+  result = doca_flow_pipe_create(cfg, pipe_cfg->fwd, pipe_cfg->fwd_miss, pipe);
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to create UPF accel pipe: %s",
+                 doca_error_get_descr(result));
+    goto destroy_pipe_cfg;
+  }
+
+destroy_pipe_cfg:
+  doca_flow_pipe_cfg_destroy(cfg);
+  return result;
+}
+
+/*
  * Add all SMF related rules
  *
  * @upf_accel_ctx [in]: UPF Acceleration context.
@@ -589,48 +680,200 @@ pipe_shared_meter_insert(struct upf_accel_ctx *upf_accel_ctx, uint32_t pdr_idx,
  */
 static doca_error_t
 upf_accel_smf_rules_add(struct upf_accel_ctx *upf_accel_ctx) {
-  const struct upf_accel_pdrs *pdrs = upf_accel_ctx->upf_accel_cfg->pdrs;
-  const size_t num_pdrs = pdrs->num_pdrs;
-  const struct upf_accel_pdr *pdr;
-  struct upf_accel_qer *qer;
+  // const struct upf_accel_pdrs *pdrs = upf_accel_ctx->upf_accel_cfg->pdrs;
+  // const size_t num_pdrs = pdrs->num_pdrs;
+  // const struct upf_accel_pdr *pdr;
+  // struct upf_accel_qer *qer;
+  // doca_error_t result;
+  // uint32_t pdr_idx;
+  // uint32_t far_id;
+  // uint8_t qfi;
+  // int pdr_id;
+  // uint32_t i;
+
+  // for (pdr_idx = 0; pdr_idx < num_pdrs; pdr_idx++) {
+  // 	pdr = &pdrs->arr_pdrs[pdr_idx];
+  // 	far_id = pdr->farid;
+  // 	pdr_id = pdr->id;
+  // 	qfi = UPF_ACCEL_QFI_NONE;
+
+  // 	if (pdr->qerids_num) {
+  // 		/* QFI is chosen randomly since different QERs might have
+  // different QFI values */ 		qer =
+  // upf_accel_get_qer_by_qer_id(upf_accel_ctx->upf_accel_cfg->qers,
+  // 						  pdr->qerids[pdr->qerids_num -
+  // 1]); 		qfi = qer->qfi;
+  // 	}
+  // 	DOCA_LOG_DBG("PDR %u QFI %u", pdr_id, qfi);
+
+  // 	result = upf_accel_tx_counters_insert(upf_accel_ctx,
+  // 					      pdr_idx,
+  // 					      pdr_id,
+  // 					      far_id,
+  // 					      qfi,
+  // 					      pdr->pdi_si,
+  // 					      upf_accel_ctx->smf_entries[pdr_idx]);
+  // 	if (result != DOCA_SUCCESS)
+  // 		return result;
+
+  // 	for (i = 0; i < pdr->qerids_num; ++i) {
+  // 		result = pipe_shared_meter_insert(upf_accel_ctx, pdr_idx, i);
+  // 		if (result != DOCA_SUCCESS)
+  // 			return result;
+  // 	}
+
   doca_error_t result;
-  uint32_t pdr_idx;
-  uint32_t far_id;
-  uint8_t qfi;
-  int pdr_id;
-  uint32_t i;
+  struct doca_flow_pipe *static_pipe = NULL;
+  struct doca_flow_pipe_cfg *pipe_cfg;
+  struct doca_flow_match match_mask = {0};
+  struct doca_flow_match match = {0};
+  struct doca_flow_actions actions = {0};
+  struct doca_flow_fwd fwd = {0};
+  struct doca_flow_pipe_entry *entry = NULL;
+  struct doca_flow_port *port = upf_accel_ctx->ports[0];
 
-  for (pdr_idx = 0; pdr_idx < num_pdrs; pdr_idx++) {
-    pdr = &pdrs->arr_pdrs[pdr_idx];
-    far_id = pdr->farid;
-    pdr_id = pdr->id;
-    qfi = UPF_ACCEL_QFI_NONE;
+  DOCA_LOG_INFO("Configuring static root pipe for GTP-U decap...");
 
-    if (pdr->qerids_num) {
-      /* QFI is chosen randomly since different QERs might have
-different QFI values */
-      qer = upf_accel_get_qer_by_qer_id(upf_accel_ctx->upf_accel_cfg->qers,
-                                        pdr->qerids[pdr->qerids_num - 1]);
-      qfi = qer->qfi;
-    }
-    DOCA_LOG_DBG("PDR %u QFI %u", pdr_id, qfi);
-
-    result = upf_accel_tx_counters_insert(upf_accel_ctx, pdr_idx, pdr_id,
-                                          far_id, qfi, pdr->pdi_si,
-                                          upf_accel_ctx->smf_entries[pdr_idx]);
-    if (result != DOCA_SUCCESS)
-      return result;
-
-    for (i = 0; i < pdr->qerids_num; ++i) {
-      result = pipe_shared_meter_insert(upf_accel_ctx, pdr_idx, i);
-      if (result != DOCA_SUCCESS)
-        return result;
-    }
+  // 1. Create Pipe Configuration
+  result = doca_flow_pipe_cfg_create(&pipe_cfg, port);
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to create pipe cfg: %s", doca_error_get_descr(result));
+    return result;
   }
 
-  return DOCA_SUCCESS;
-}
+  result = doca_flow_pipe_cfg_set_name(pipe_cfg, "STATIC_DECAP_PIPE");
+  result |= doca_flow_pipe_cfg_set_is_root(pipe_cfg, true);
+  result |= doca_flow_pipe_cfg_set_type(pipe_cfg, DOCA_FLOW_PIPE_BASIC);
 
+  // 1.1 Set Domain
+  result |= doca_flow_pipe_cfg_set_domain(pipe_cfg, DOCA_FLOW_PIPE_DOMAIN_EGRESS);
+
+  // 2. Configure Match Mask
+  // We want to match Outer Src IP and Inner Src IP. TEID is wildcard (0
+  match_mask.parser_meta.inner_l3_type = DOCA_FLOW_L3_TYPE_IP4;
+  match.parser_meta.inner_l3_type = DOCA_FLOW_L3_META_IPV4;
+
+  result |= doca_flow_pipe_cfg_set_match(pipe_cfg, &match, &match_mask);
+
+  // 3. Configure Actions (Decap)
+  actions.decap_type = DOCA_FLOW_RESOURCE_TYPE_NON_SHARED;
+  actions.decap_cfg.eth.type = UINT16_MAX;
+  struct doca_flow_actions *actions_arr[] = {&actions};
+  result |=
+      doca_flow_pipe_cfg_set_actions(pipe_cfg, actions_arr, NULL, NULL, 1);
+
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to configure pipe settings: %s",
+                 doca_error_get_descr(result));
+    doca_flow_pipe_cfg_destroy(pipe_cfg);
+    return result;
+  }
+
+  // 4. Create Pipe
+  fwd.type = DOCA_FLOW_FWD_PORT;
+  fwd.port_id = 0; // Forward to port 1
+
+  result = doca_flow_pipe_create(pipe_cfg, &fwd, NULL, &static_pipe);
+  doca_flow_pipe_cfg_destroy(pipe_cfg); // Cleanup cfg
+
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to create static pipe: %s",
+                 doca_error_get_descr(result));
+    return result;
+  }
+
+  // 5. Add Entry
+  actions.decap_cfg.eth.type = rte_cpu_to_be_16(DOCA_FLOW_ETHER_TYPE_IPV4);
+  DOCA_LOG_INFO("Adding static entry...");
+  result = doca_flow_pipe_add_entry(0, static_pipe, &match, 0, &actions, NULL,
+                                    NULL, DOCA_FLOW_NO_WAIT, NULL, &entry);
+
+  if (result != DOCA_SUCCESS) {
+    DOCA_LOG_ERR("Failed to add entry: %s", doca_error_get_descr(result));
+    return result;
+  }
+
+  // result = doca_flow_entries_process(port, 0, 0, 0);
+  // if (result != DOCA_SUCCESS) {
+  //   DOCA_LOG_ERR("Failed to process: %s", doca_error_get_descr(result));
+  //   return result;
+  // }
+
+  DOCA_LOG_INFO("Static flow added successfully!");
+  DOCA_LOG_INFO("  Match: outer_src=192.168.200.2, inner_src=10.60.0.1");
+  DOCA_LOG_INFO("  Action: Decapsulate GTP-U -> Port 1");
+
+  return DOCA_SUCCESS;
+
+  //   doca_error_t result;
+  //   struct doca_flow_pipe *static_pipe = NULL;
+  //   struct upf_accel_pipe_cfg pipe_cfg = {0};
+  //   struct doca_flow_fwd fwd = {.type = DOCA_FLOW_FWD_PORT, .port_id = 1};
+  //   struct doca_flow_actions act_decap = {.decap_type =
+  //                                             DOCA_FLOW_RESOURCE_TYPE_NON_SHARED,
+  //                                         .decap_cfg.eth.type =
+  //                                         UINT16_MAX};
+  //   struct doca_flow_match match_mask = {.parser_meta.inner_l3_type =
+  //                                            DOCA_FLOW_L3_META_IPV4 |
+  //                                            DOCA_FLOW_L3_META_IPV6};
+  //   struct doca_flow_match match = {.parser_meta.inner_l3_type =
+  //   UINT32_MAX}; struct doca_flow_actions *action_list[] = {&act_decap};
+  //   const uint8_t src_mac[] = UPF_ACCEL_SRC_MAC;
+  //   const uint8_t dst_mac[] = UPF_ACCEL_DST_MAC;
+  //   char *pipe_name = "DECAP_PIPE";
+
+  //   pipe_cfg.name = pipe_name;
+  //   pipe_cfg.domain = 0;
+  //   pipe_cfg.port = upf_accel_ctx->ports[0];
+  //   pipe_cfg.is_root = true;
+  //   pipe_cfg.type = DOCA_FLOW_PIPE_BASIC;
+  //   pipe_cfg.num_entries = 1;
+  //   pipe_cfg.match = &match;
+  //   pipe_cfg.match_mask = &match_mask;
+  //   pipe_cfg.mon = NULL;
+  //   pipe_cfg.fwd = &fwd;
+  //   pipe_cfg.fwd_miss = NULL;
+  //   pipe_cfg.actions.num_actions = 1;
+  //   pipe_cfg.actions.action_list = action_list;
+  //   pipe_cfg.actions.action_desc_list = NULL;
+
+  //   SET_MAC_ADDR(act_decap.decap_cfg.eth.src_mac, src_mac[0], src_mac[1],
+  //                src_mac[2], src_mac[3], src_mac[4], src_mac[5]);
+  //   SET_MAC_ADDR(act_decap.decap_cfg.eth.dst_mac, dst_mac[0], dst_mac[1],
+  //                dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
+
+  //   DOCA_LOG_INFO("Configuring static root pipe for GTP-U decap...");
+
+  //   result = upf_accel_pipe_create(&pipe_cfg, &static_pipe);
+
+  //   if (result != DOCA_SUCCESS) {
+  //     DOCA_LOG_ERR("Failed to create static pipe: %s",
+  //                  doca_error_get_descr(result));
+  //     return result;
+  //   }
+
+  //   DOCA_LOG_INFO("Adding static entry...");
+  //   result = doca_flow_pipe_add_entry(0, static_pipe, &match, 0,
+  //   &act_decap, NULL,
+  //                                     NULL, DOCA_FLOW_NO_WAIT, NULL, NULL);
+
+  //   if (result != DOCA_SUCCESS) {
+  //     DOCA_LOG_ERR("Failed to add entry: %s",
+  //     doca_error_get_descr(result)); return result;
+  //   }
+
+  //   result = doca_flow_entries_process(0, 0, 0, 0);
+  //   if (result != DOCA_SUCCESS) {
+  //     DOCA_LOG_ERR("Failed to process: %s", doca_error_get_descr(result));
+  //     return result;
+  //   }
+
+  //   DOCA_LOG_INFO("Static flow added successfully!");
+  //   DOCA_LOG_INFO("  Match: outer_src=192.168.200.2, inner_src=10.60.0.1");
+  //   DOCA_LOG_INFO("  Action: Decapsulate GTP-U -> Port 1");
+
+  //   return DOCA_SUCCESS;
+}
 /*
  * Alloc and populate the counter IDs used for quota enforcement
  *
@@ -1461,14 +1704,14 @@ static doca_error_t init_upf_accel(struct upf_accel_ctx *upf_accel_ctx,
     goto cleanup_ports;
   }
 
-  result = upf_accel_shared_meters_init(upf_accel_ctx);
+  // result = upf_accel_shared_meters_init(upf_accel_ctx);
   if (result != DOCA_SUCCESS) {
     DOCA_LOG_ERR("Failed to init DOCA shared meters: %s",
                  doca_error_get_descr(result));
     goto cleanup_ports;
   }
 
-  result = upf_accel_pipeline_create(upf_accel_ctx);
+  // result = upf_accel_pipeline_create(upf_accel_ctx);
   if (result != DOCA_SUCCESS) {
     DOCA_LOG_ERR("Failed to create pipeline: %s", doca_error_get_descr(result));
     goto cleanup_ports;
@@ -1572,7 +1815,7 @@ upf_accel_apply_pending_smf_cfg(struct upf_accel_ctx *upf_accel_ctx,
   free(cfg);
 
   /* Initialize shared meters for the new config */
-  result = upf_accel_shared_meters_init(upf_accel_ctx);
+  // result = upf_accel_shared_meters_init(upf_accel_ctx);
   if (result != DOCA_SUCCESS) {
     DOCA_LOG_ERR("Failed to init shared meters for new SMF config: %s",
                  doca_error_get_descr(result));
@@ -1580,7 +1823,7 @@ upf_accel_apply_pending_smf_cfg(struct upf_accel_ctx *upf_accel_ctx,
   }
 
   /* Add SMF related rules (PDR/FAR/QER/URR) */
-  result = upf_accel_smf_rules_add(upf_accel_ctx);
+  //   result = upf_accel_smf_rules_add(upf_accel_ctx);
   if (result != DOCA_SUCCESS) {
     DOCA_LOG_ERR("Failed to add SMF rules for new config: %s",
                  doca_error_get_descr(result));
@@ -1592,9 +1835,9 @@ upf_accel_apply_pending_smf_cfg(struct upf_accel_ctx *upf_accel_ctx,
     struct entries_status *ctrl_status =
         &upf_accel_ctx->static_entry_ctx[port_id].static_ctx.ctrl_status;
 
-    result = doca_flow_entries_process(
-        upf_accel_ctx->ports[port_id], 0, DEFAULT_TIMEOUT_US,
-        upf_accel_ctx->num_static_entries[port_id]);
+    // result = doca_flow_entries_process(
+    //     upf_accel_ctx->ports[port_id], 0, DEFAULT_TIMEOUT_US,
+    //     upf_accel_ctx->num_static_entries[port_id]);
     if (result != DOCA_SUCCESS) {
       DOCA_LOG_ERR("Failed to process entries on port %u: %s", port_id,
                    doca_error_get_descr(result));
@@ -1643,11 +1886,11 @@ static doca_error_t run_upf_accel(struct upf_accel_ctx *upf_accel_ctx,
   sa.sa_handler = dummy_handler;
   sigaction(SIGUSR2, &sa, NULL);
 
-  if (rte_eal_mp_remote_launch(upf_accel_fp_loop_wrapper, fp_data_arr,
-                               SKIP_MAIN)) {
-    DOCA_LOG_ERR("Failed to launch FP threads");
-    return result;
-  }
+  //   if (rte_eal_mp_remote_launch(upf_accel_fp_loop_wrapper, fp_data_arr,
+  //                                SKIP_MAIN)) {
+  //     DOCA_LOG_ERR("Failed to launch FP threads");
+  //     return result;
+  //   }
 
   DOCA_LOG_INFO("Waiting for traffic, press Ctrl+C for termination");
 
